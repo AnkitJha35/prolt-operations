@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface RecRecordRepository extends JpaRepository<RecRecord, String>, JpaSpecificationExecutor<RecRecord> {
+    void deleteByDatasetId(String datasetId);
 }

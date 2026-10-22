@@ -7,4 +7,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UploadHistoryRepository extends JpaRepository<UploadHistory, String>, JpaSpecificationExecutor<UploadHistory> {
+
+    java.util.List<UploadHistory> findByDatasetIdOrderByTimestampAsc(String datasetId);
+
+    java.util.Optional<UploadHistory> findFirstByOrderByTimestampDesc();
 }

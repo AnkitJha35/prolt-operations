@@ -40,6 +40,27 @@ public class Dataset implements Serializable {
     @Column(name = "updatedAt")
     private LocalDateTime updatedAt;
 
+    @PrePersist
+    public void prePersist() {
+        if (status == null) {
+            status = DatasetStatus.ACTIVE;
+        }
+        if (uploadedAt == null) {
+            uploadedAt = LocalDateTime.now();
+        }
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
     protected Dataset() {
     }
 

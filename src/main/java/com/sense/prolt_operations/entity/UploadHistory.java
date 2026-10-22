@@ -34,6 +34,13 @@ public class UploadHistory implements Serializable {
     @Column(name = "timestamp")
     private LocalDateTime timestamp;
 
+    @PrePersist
+    public void prePersist() {
+        if (timestamp == null) {
+            timestamp = LocalDateTime.now();
+        }
+    }
+
     protected UploadHistory() {
     }
 

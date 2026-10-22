@@ -153,4 +153,35 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Health checks `/health` and `/health/database` (200).
   - All 20 tests in project passing with zero failures.
 
+### Phase 3: Market Telemetry & Ingestion Pipelines
+- **Completed At:** 2026-10-22 17:38
+- **Scope & What Was Built:**
+  - **DTO Records (com.sense.prolt_operations.dto.dataset / scraper):**
+    - `DatasetUploadDTO`, `DatasetSummaryDTO`, `DatasetTimeseriesDTO`, `DatasetResponseDTO`.
+    - `UploadHistoryDTO`, `WebhookImportDTO`, `ScraperSyncDTO`.
+  - **Services (com.sense.prolt_operations.service):**
+    - `PersistenceService`: Handles 96-time-block batch persistence across DAM, GDAM, RTM, and REC records. Includes duplicate detection returning 409 Conflict, replacement handling, soft deletion, and fallback generation of missing fields (e.g., `sessionId` for RTM records).
+    - `DatasetService`: Implements `GET /api/datasets/summary`, `GET /api/datasets/timeseries` (`DATA-01`), `GET /api/datasets`, `GET /api/datasets/{id}`, `GET /api/datasets/{id}/history`, `DELETE /api/datasets/{id}` (verifying 409 Conflict on dependencies). Also supports `/api/upload-history` paginated queries.
+    - `DashboardService`: Aggregates 15-minute, hourly, and daily metrics across DAM, GDAM, RTM, REC markets and produces dashboard overview analytics.
+    - `ScraperService`: Integrates Jsoup HTML fixture parsing and Playwright headless browser scraping. Strictly guarded by `app.run-scraper` and configurable fixture fallback so offline tests never trigger live network calls.
+    - `StarrocksService`: MySQL wire protocol querying `prolt_load_data` with connection validation and safe fallbacks.
+    - `ApiLogService`: Records API access and background execution logs.
+  - **Controllers (com.sense.prolt_operations.controller):**
+    - `DatasetController`: Mounted at `/api/datasets` and `/api/dataset` for legacy compatibility.
+    - `UploadHistoryController`: Mounted at `/api/upload-history`.
+    - `DashboardController`: Mounted at `/api/dashboard` (publicly accessible per security rules).
+    - `ScraperController`: Mounted at `/api/scraper`, featuring authenticated `/sync` and webhook-authenticated `/import` (`SCRAPE-01`) secured via `x-webhook-token` or `x-webhook-secret`.
+  - **Scheduler (com.sense.prolt_operations.scheduler):**
+    - `AppScheduler`: Implements 11 `@Scheduled` cron jobs matching Node cron patterns in `Asia/Kolkata` timezone, safely guarded by `app.run-scraper`.
+  - **User Decisions Implemented (Priorities 1 - 4):**
+    1. *OTP Backdoor*: Controlled by `app.auth.superadmin-otp-bypass.enabled` (true in dev/test, false in prod). OTP value read from `app.auth.superadmin-otp-bypass.otp-value=749261`. Added `// PARITY` comments and integration tests verifying both states.
+    2. *OTP Store*: Redis fallback to memory allowed only when `app.auth.otp.allow-memory-fallback=true` (dev/test). In prod mode, throws 500 error if Redis is unavailable.
+    3. *OTP Route Aliases*: Removed deprecated `/otp/generate` and `/otp/verify` endpoints, retaining only `/send-otp` and `/verify-otp`. Updated baseline documentation.
+    4. *SUPER_ADMIN Quirk*: Documented the Node `adminMiddleware` behavior in `16-conversion-questions.md`.
+- **Test Results:**
+  - `MarketAndScraperIntegrationTest`: 8 tests verifying `DATA-01`, `SCRAPE-01`, dataset CRUD, timeseries extraction, conflict checks, and dashboard metrics.
+  - `ScraperAndSchedulerIntegrationTest`: 5 tests verifying fixture HTML scraping, 96-block generation, StarRocks integration, and AppScheduler.
+  - Testcontainers lifecycle upgraded to singleton static container in `BaseIntegrationTest`.
+  - All 33/33 tests passing cleanly.
+
 

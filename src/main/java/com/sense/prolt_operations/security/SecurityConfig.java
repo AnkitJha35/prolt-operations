@@ -57,7 +57,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/health", "/health/**", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                .requestMatchers("/api/auth/login", "/api/auth/send-otp", "/api/auth/verify-otp", "/api/auth/otp/**").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/send-otp", "/api/auth/verify-otp").permitAll()
                 .requestMatchers("/api/dashboard/**").permitAll()
                 .requestMatchers("/api/up-market/**").permitAll()
                 .requestMatchers("/api/forecast/**", "/forecast/**").permitAll()

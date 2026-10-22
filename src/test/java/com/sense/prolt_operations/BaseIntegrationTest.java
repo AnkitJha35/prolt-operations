@@ -8,14 +8,17 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest
-@Testcontainers
 public abstract class BaseIntegrationTest {
 
-    @Container
-    public static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("Prolt_Operations")
-            .withUsername("postgres")
-            .withPassword("password");
+    public static final PostgreSQLContainer<?> postgres;
+
+    static {
+        postgres = new PostgreSQLContainer<>("postgres:16")
+                .withDatabaseName("Prolt_Operations")
+                .withUsername("postgres")
+                .withPassword("password");
+        postgres.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -23,5 +26,13 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("spring.jpa.hibernate.naming.physical-strategy", () -> "org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl");
+        registry.add("spring.jpa.properties.hibernate.physical_naming_strategy", () -> "org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl");
+        registry.add("spring.jpa.properties.hibernate.globally_quoted_identifiers", () -> "true");
+        registry.add("app.auth.superadmin-otp-bypass.enabled", () -> "true");
+        registry.add("app.auth.superadmin-otp-bypass.otp-value", () -> "749261");
+        registry.add("app.auth.superadmin-otp-bypass.email", () -> "super.admin@probus.io");
+        registry.add("app.auth.otp.allow-memory-fallback", () -> "true");
+        registry.add("app.run-scraper", () -> "false");
     }
 }

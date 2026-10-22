@@ -7,4 +7,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DamRecordRepository extends JpaRepository<DamRecord, String>, JpaSpecificationExecutor<DamRecord> {
+
+    java.util.List<DamRecord> findByDatasetIdOrderByIntervalNumberAsc(String datasetId);
+
+    void deleteByDatasetId(String datasetId);
 }

@@ -39,14 +39,14 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping(value = {"/send-otp", "/otp/generate"})
+    @PostMapping("/send-otp")
     @Operation(summary = "Send OTP", description = "Send OTP to user email")
     public ResponseEntity<SuccessResponse> sendOtp(@RequestBody SendOtpDTO dto) {
         SuccessResponse response = authService.sendOtp(dto);
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping(value = {"/verify-otp", "/otp/verify"})
+    @PostMapping("/verify-otp")
     @Operation(summary = "Verify OTP", description = "Verify OTP and obtain JWT")
     public ResponseEntity<AuthResponse> verifyOtp(@RequestBody VerifyOtpDTO dto) {
         AuthResponse response = authService.verifyOtp(dto);

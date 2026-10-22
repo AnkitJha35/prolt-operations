@@ -31,6 +31,13 @@ public class ApiLog implements Serializable {
     @Column(name = "details")
     private String details;
 
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
     protected ApiLog() {
     }
 

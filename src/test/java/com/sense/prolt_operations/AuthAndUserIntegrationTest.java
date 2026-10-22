@@ -44,6 +44,9 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private com.sense.prolt_operations.service.OtpService otpService;
+
     // Helper to generate admin / superadmin tokens
     private String getSuperAdminToken() {
         User superAdmin = userRepository.findByUsername("superadmin")
@@ -149,19 +152,19 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(5)
-    @DisplayName("AUTH-02 alias: /api/auth/otp/generate returns 200")
-    void testAuth02_OtpGenerateAlias_Success() throws Exception {
+    @DisplayName("AUTH-02: Removed alias /api/auth/otp/generate returns 401/404")
+    void testAuth02_OtpGenerateAlias_Removed() throws Exception {
         String payload = """
             {
                 "email": "admin@iexdashboard.local"
             }
             """;
 
+        // /otp/generate was removed; without auth it returns 401 Unauthorized
         mockMvc.perform(post("/api/auth/otp/generate")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -184,8 +187,9 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(7)
-    @DisplayName("AUTH-03: Email OTP Verification - Superadmin Backdoor (Success)")
-    void testAuth03_VerifyOtp_Superadmin_Success() throws Exception {
+    @DisplayName("AUTH-03: Email OTP Verification - Superadmin Backdoor (Enabled -> Success)")
+    void testAuth03_VerifyOtp_Superadmin_BypassEnabled_Success() throws Exception {
+        otpService.setSuperadminBypassEnabled(true);
         String payload = """
             {
                 "email": "super.admin@probus.io",
@@ -205,21 +209,49 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(8)
-    @DisplayName("AUTH-03 alias: /api/auth/otp/verify returns 200")
-    void testAuth03_OtpVerifyAlias_Success() throws Exception {
-        String payload = """
-            {
-                "email": "super.admin@probus.io",
-                "otp": "749261"
-            }
-            """;
+    @DisplayName("AUTH-03: Email OTP Verification - Superadmin Backdoor (Disabled -> Fails)")
+    void testAuth03_VerifyOtp_Superadmin_BypassDisabled_Fails() throws Exception {
+        try {
+            otpService.setSuperadminBypassEnabled(false);
+            String payload = """
+                {
+                    "email": "super.admin@probus.io",
+                    "otp": "749261"
+                }
+                """;
 
-        mockMvc.perform(post("/api/auth/otp/verify")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.token").isString());
+            mockMvc.perform(post("/api/auth/verify-otp")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(payload))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.message").value("Invalid or expired OTP"));
+        } finally {
+            otpService.setSuperadminBypassEnabled(true);
+        }
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("AUTH-03b: Prod Redis Failure Enforced when allowMemoryFallback is false")
+    void testAuth03_ProdRedisFailure_Enforced() throws Exception {
+        try {
+            otpService.setAllowMemoryFallback(false);
+            String payload = """
+                {
+                    "email": "admin@iexdashboard.local"
+                }
+                """;
+
+            mockMvc.perform(post("/api/auth/send-otp")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(payload))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.message").value("Redis connection error"));
+        } finally {
+            otpService.setAllowMemoryFallback(true);
+        }
     }
 
     @Test

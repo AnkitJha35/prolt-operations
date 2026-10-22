@@ -7,4 +7,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface GdamRecordRepository extends JpaRepository<GdamRecord, String>, JpaSpecificationExecutor<GdamRecord> {
+
+    java.util.List<GdamRecord> findByDatasetIdOrderByIntervalNumberAsc(String datasetId);
+
+    void deleteByDatasetId(String datasetId);
 }

@@ -7,4 +7,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface RtmRecordRepository extends JpaRepository<RtmRecord, String>, JpaSpecificationExecutor<RtmRecord> {
+
+    java.util.List<RtmRecord> findByDatasetIdOrderByIntervalNumberAsc(String datasetId);
+
+    void deleteByDatasetId(String datasetId);
 }
