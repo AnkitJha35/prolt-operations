@@ -106,3 +106,51 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Mapped `@db.SmallInt` fields to Java `Short` to match PostgreSQL `int2` / JDBC `Types#SMALLINT`.
   - Mapped `@db.Timestamptz` to `OffsetDateTime` to match PostgreSQL `timestamptz`.
 
+### Phase 2: Security & Identity Subsystem
+- **Completed At:** 2026-10-22 16:54
+- **Scope & What Was Built:**
+  - **DTO Records (com.sense.prolt_operations.dto.auth / user):**
+    - `LoginDTO`: supports `username`, `email`, and `password` with `effectiveUsername()`.
+    - `SendOtpDTO`: `email` payload.
+    - `VerifyOtpDTO`: `email` and `otp` payload.
+    - `AuthUserResponse`: `id`, `username`, `email`, `role`, `hiddenModules`, `readOnlyModules`, plus `@JsonProperty("name")`.
+    - `AuthResponse`: `success`, `token`, and `user`.
+    - `SuccessResponse`: `success` and `message`.
+    - `CreateUserDTO`: `username`, `email`, `password`, `role`, `hiddenModules`, `readOnlyModules`.
+    - `UpdateUserDTO`: optional update fields matching Node validation rules.
+    - `UserDTO`: serialized representation for user management.
+  - **Security Components (com.sense.prolt_operations.security):**
+    - `JwtService`: JJWT 0.12.6 token generation and parsing, claims (`id`, `username`, `email`, `role`, `hiddenModules`, `readOnlyModules`), configurable `app.jwt.secret` (with SHA-256 padding for keys < 32 bytes) and `app.jwt.expires-in` (supporting `7d`, `1h`, `15m`, etc.).
+    - `ProltUserPrincipal`: implements `UserDetails`, embeds custom claims, provides `ROLE_` + `role` and raw `role` authorities.
+    - `JwtAuthenticationFilter`: extracts `Bearer <token>` from HTTP `Authorization` header, validates claims, sets `SecurityContextHolder`.
+    - `RestAuthenticationEntryPoint`: returns HTTP 401 `{"success": false, "message": "Unauthorized"}` on unauthenticated access.
+    - `RestAccessDeniedHandler`: returns HTTP 403 `{"success": false, "message": "Forbidden: Super Admin access required"}` on `/api/users/**` access by non-superadmins.
+    - `AuthRateLimiterFilter`: Bucket4j token bucket rate limiter (10 tokens per 15 minutes per IP) on `/api/auth/login`, `/api/auth/send-otp`, `/api/auth/verify-otp`, `/api/auth/otp/generate`, `/api/auth/otp/verify`. Returns HTTP 429 `{"success": false, "message": "Too many login attempts, please try again after 15 minutes"}` when exceeded.
+    - `SecurityConfig`: Spring Security 6 filter chain, stateless session, CSRF disabled, CORS reflection (`allowedOriginPattern("*")`), Helmet CSP directives, public access to Swagger, health, auth, dashboard, and up-market endpoints, superadmin requirement on `/api/users/**`. PasswordEncoder bean configured with `BCryptPasswordEncoder(12)`.
+  - **Services (com.sense.prolt_operations.service):**
+    - `OtpService`: 6-digit numeric OTP generation, 5-minute TTL, single-use invalidation, optional Redis caching via `StringRedisTemplate` with automatic in-memory `ConcurrentHashMap` fallback, superadmin backdoor (`super.admin@probus.io` -> fixed OTP `749261`), dev-mode console logging when SMTP is unconfigured.
+    - `AuthService`: `login` with username/email and BCrypt password verification, `sendOtp` with user existence validation, `verifyOtp` with OTP verification and JWT issuance, `getMe` returning current user profile with dual `user` and `data` objects.
+    - `UserService`: `getAllUsers` sorted descending by `createdAt`, `getAuditLogs` sorted descending by `timestamp`, `createUser` with role validation (`ADMIN` or `CLIENT`), uniqueness check, BCrypt password hashing, and audit log generation, `updateUser` with delta tracking and audit logging, `deleteUser` with audit logging.
+  - **Controllers (com.sense.prolt_operations.controller):**
+    - `AuthController`: `@PostMapping("/api/auth/login")`, `@PostMapping("/api/auth/send-otp")` & alias `/api/auth/otp/generate`, `@PostMapping("/api/auth/verify-otp")` & alias `/api/auth/otp/verify`, `@GetMapping("/api/auth/me")`.
+    - `UserController`: `@GetMapping("/api/users")`, `@GetMapping("/api/users/audit-logs")`, `@PostMapping("/api/users")` (HTTP 201), `@PutMapping("/api/users/{id}")`, `@DeleteMapping("/api/users/{id}")`.
+    - `HealthController`: `@GetMapping("/health")` (`{"success": true, "status": "healthy"}`), `@GetMapping("/health/database")` (`{"success": true, "database": "connected"}`).
+  - **Entities Updated:**
+    - `User`: added `hiddenModules` (`String[]` / `text[]`), `readOnlyModules` (`String[]` / `text[]`), `@PrePersist` and `@PreUpdate` lifecycle callbacks.
+    - `UserAuditLog`: added `@PrePersist` callback for `timestamp`.
+    - `UserRepository`: added `findAllByOrderByCreatedAtDesc()`.
+    - `UserAuditLogRepository`: added `findAllByOrderByTimestampDesc()`.
+    - `AppRunner`: added automatic synchronization of seeded admin user password on startup.
+- **Verification & Parity:**
+  - Integration tests in `AuthAndUserIntegrationTest` covering all scenarios:
+    - `AUTH-01`: Standard login (200), missing credentials (400), invalid credentials (401).
+    - `AUTH-02`: Send OTP (200), user not found (404), alias `/api/auth/otp/generate` (200).
+    - `AUTH-03`: Superadmin backdoor verification `749261` (200), incorrect OTP (401), alias `/api/auth/otp/verify` (200).
+    - `GET /api/auth/me`: Valid JWT (200), unauthenticated (401).
+    - `USER-01`: SuperAdmin user creation (201), update (200), list (200), audit logs (200), delete (200).
+    - `USER-01a`: Non-superadmin access rejected with 403 `Forbidden: Super Admin access required`.
+    - `USER-01b`: Duplicate username/email rejected with 400 `Username or email already exists`.
+    - Health checks `/health` and `/health/database` (200).
+  - All 20 tests in project passing with zero failures.
+
+

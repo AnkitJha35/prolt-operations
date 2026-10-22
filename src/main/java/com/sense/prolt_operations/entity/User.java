@@ -29,11 +29,41 @@ public class User implements Serializable {
     @Column(name = "role")
     private Role role;
 
+    @Column(name = "hiddenModules")
+    private String[] hiddenModules = new String[0];
+
+    @Column(name = "readOnlyModules")
+    private String[] readOnlyModules = new String[0];
+
     @Column(name = "createdAt")
     private LocalDateTime createdAt;
 
     @Column(name = "updatedAt")
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
+        if (hiddenModules == null) {
+            hiddenModules = new String[0];
+        }
+        if (readOnlyModules == null) {
+            readOnlyModules = new String[0];
+        }
+        if (role == null) {
+            role = Role.CLIENT;
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
     protected User() {
     }
@@ -88,6 +118,38 @@ public class User implements Serializable {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public String[] getHiddenModules() {
+        return hiddenModules;
+    }
+
+    public void setHiddenModules(String[] hiddenModules) {
+        this.hiddenModules = hiddenModules != null ? hiddenModules : new String[0];
+    }
+
+    public java.util.List<String> getHiddenModulesList() {
+        return hiddenModules != null ? java.util.Arrays.asList(hiddenModules) : java.util.Collections.emptyList();
+    }
+
+    public void setHiddenModulesList(java.util.List<String> list) {
+        this.hiddenModules = list != null ? list.toArray(new String[0]) : new String[0];
+    }
+
+    public String[] getReadOnlyModules() {
+        return readOnlyModules;
+    }
+
+    public void setReadOnlyModules(String[] readOnlyModules) {
+        this.readOnlyModules = readOnlyModules != null ? readOnlyModules : new String[0];
+    }
+
+    public java.util.List<String> getReadOnlyModulesList() {
+        return readOnlyModules != null ? java.util.Arrays.asList(readOnlyModules) : java.util.Collections.emptyList();
+    }
+
+    public void setReadOnlyModulesList(java.util.List<String> list) {
+        this.readOnlyModules = list != null ? list.toArray(new String[0]) : new String[0];
     }
 
     public LocalDateTime getCreatedAt() {

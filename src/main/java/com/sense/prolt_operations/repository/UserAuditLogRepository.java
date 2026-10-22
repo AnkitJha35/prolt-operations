@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserAuditLogRepository extends JpaRepository<UserAuditLog, String>, JpaSpecificationExecutor<UserAuditLog> {
+
+    java.util.List<UserAuditLog> findAllByOrderByTimestampDesc();
 }

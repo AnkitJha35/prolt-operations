@@ -1,0 +1,42 @@
+package com.sense.prolt_operations.controller;
+
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.Map;
+import javax.sql.DataSource;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@RestController
+@Tag(name = "Health", description = "System and database health checks")
+public class HealthController {
+
+    private final DataSource dataSource;
+
+    public HealthController(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    @GetMapping("/health")
+    @Operation(summary = "Liveness probe", description = "Returns server health status")
+    public ResponseEntity<Map<String, Object>> health() {
+        return ResponseEntity.ok(Map.of("success", true, "status", "healthy"));
+    }
+
+    @GetMapping("/health/database")
+    @Operation(summary = "Database readiness probe", description = "Checks database connectivity")
+    public ResponseEntity<Map<String, Object>> healthDatabase() {
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("SELECT 1");
+            return ResponseEntity.ok(Map.of("success", true, "database", "connected"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "database", "disconnected", "error", e.getMessage()));
+        }
+    }
+}
