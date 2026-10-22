@@ -245,4 +245,40 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Pure Java JFreeChart PNG rendering producing valid PNG magic bytes (`0x89 0x50 0x4E 0x47`).
   - All tests passing with zero failures.
 
+### Phase 6: Full Parity Verification & Zero-Downtime Cutover
+- **Completed At:** 2026-10-22 18:25
+- **Scope & What Was Built:**
+  - **Subsystem 1 (Upload Subsystem):**
+    - `UploadProcessingService`: CSV and Excel (POI) parser handling 96 interval blocks across DAM, GDAM, RTM, and REC markets. Validates headers, parses date formats, and delegates directly to `PersistenceService.persistDataset`.
+    - `UploadController`: `@PostMapping("/api/uploads")` multipart handler accepting `file`, `market`, `deliveryDate`, and `action` (`create` or `replace`). `@GetMapping("/api/uploads/health")` returning `{"success": true, "storage": "healthy"}`.
+  - **Subsystem 2 (Resource Center Subsystem):**
+    - `ResourceCenterService`: Universal CRUD and bulk import engine for 9 master tables (`region-state`, `discom-list`, `ists-charges`, `iex-fees`, `prolt-margin`, `ctu-charges`, `state-charges`, `state-tariff`, `fppa-charges`). Implements date overlap prevention for `state-charges` and `ists-charges`, discom bracket normalization, and audit trail persistence via `AuditLogRepository`.
+    - `ResourceCenterController`: Dual-mounted on `/api/resource-center`, handling `GET /:resourceType`, `POST /:resourceType`, `POST /:resourceType/bulk`, `PUT /:resourceType/:id`, `DELETE /:resourceType/:id`.
+  - **Subsystem 3 (Database & Holiday Subsystem):**
+    - `HolidayService`: Holiday calendar CRUD and bulk Excel/CSV replace workflow with date format flexibility (`dd/MM/yyyy`, `yyyy-MM-dd`).
+    - `DatabaseService`: Multi-dataset query service supporting `getAllIndiaDemand`, `getStateWiseDemand`, `getGenerationData`, `getWeatherData`, `getCityStateData`, and streaming CSV exports for telemetry and coordinate sets.
+    - `DatabaseController`: Endpoints at `/api/database/**`.
+  - **Subsystem 4 (API Log Subsystem):**
+    - `ApiLogService`: Paginated query interface for system activity logs, distinct API name discovery, and execution statistics (`{ total, success, error, accuracy }`).
+    - `ApiLogController`: Dual-mounted at `/api/logs` and `/api/api-log`.
+  - **Subsystem 5 (Market Operations Subsystem):**
+    - `MarketOperationsService`: Native SQL full outer join query combining DAM, RTM, and GDAM records for each time block (1 to 96) for a given delivery date.
+    - `MarketOperationsController`: `GET /api/market-operations`.
+  - **Subsystem 6 (Forecast Subsystem):**
+    - `ForecastService`: Model-based DAM price forecasting with UP actual MCP mapping, StarRocks consumer & All-India demand forecast queries, generation forecast, and market selection forecast.
+    - `ForecastController`: Dual-mounted at `/api/forecast/**` and `/forecast/**`.
+  - **Subsystem 7 (UP Market Subsystem):**
+    - `UpMarketService`: Market telemetry aggregator for Uttar Pradesh and surrounding regions (`N1`, `N2`, `N3`, `UP`), calculating high/low/average MCP and volume analytics. Returns HTTP 404 when interval data is empty (matching Express behavior).
+    - `UpMarketController`: `GET /api/up-market/{market}`.
+  - **Observability & Health Probes:**
+    - Configured Micrometer Prometheus registry (`micrometer-registry-prometheus`).
+    - Enabled all Actuator endpoints with Prometheus scraping (`/actuator/prometheus`) and Kubernetes liveness/readiness probes (`/actuator/health/liveness`, `/actuator/health/readiness`).
+  - **Security Filter Chain Alignment:**
+    - Explicitly whitelisted public routes in `SecurityConfig` to maintain 100% parity with unauthenticated Express router mounts.
+    - Enforced authentication on `/api/uploads/**` and Super Admin authorization on `/api/users/**`.
+  - **Verification:**
+    - Created `FullParityIntegrationTest` verifying all 7 subsystems, health checks, Prometheus metrics, and security guards.
+    - Entire project test suite executed: **51 tests across 8 test suites passed with ZERO failures (100% success rate)**.
+
+
 
