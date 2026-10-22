@@ -216,4 +216,33 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Trader performance and daily smart meter analytics.
   - Full test suite: All 39/39 tests passing cleanly (`BUILD SUCCESS`).
 
+### Phase 5: Proposal Generation & Document Subsystems
+- **Completed At:** 2026-10-22 17:58
+- **Scope & What Was Built:**
+  - **Services (com.sense.prolt_operations.service):**
+    - `ProposalService`: Re-implemented commercial and technical Word proposal document generator in pure Java using Apache POI XWPF. Supports template loading from classpath, placeholder replacement (`XXXXXXXXXXXXX` -> client name), table dynamic row injection (Client profile, BOQ, Terms & Conditions), and UP state/voltage equipment defaults (e.g., UP 33kV NPCL vs non-NPCL, liaisoning and smart metering charges).
+    - `ChartGeneratorService`: Re-implemented dynamic data visualization engine using JFreeChart. Renders high-resolution PNG charts directly in pure Java:
+      - `generateSavingsChart`: Monthly landed cost savings bar chart.
+      - `generateConsumptionMixChart`: Open Access vs Discom energy procurement pie chart.
+      - `generateSpendComparisonChart`: Actual vs Optimized spend comparison bar chart.
+      - `generateDailySavingsChart`: Cumulative daily savings line chart.
+      - `generatePurchaseComparisonChart`: Recommended purchase allocation pie chart.
+      - Eliminates Puppeteer, headless Chrome, and Chart.js HTML generation.
+    - Python PDF extraction completely replaced with Apache PDFBox across trade report ingestion modules (`TraderPerformanceService` and `TraderPerformanceDailyService`).
+    - Python runtime and pip dependencies eliminated 100%. Dockerfile uses clean `eclipse-temurin:21-jre-alpine`.
+  - **Controllers (com.sense.prolt_operations.controller):**
+    - `ProposalController`: Mounted on dual routes `/api/proposals` and `/api/proposal`:
+      - `POST /generate`: Generates generic proposal Word document.
+      - `POST /generate-technical`: Generates technical proposal with embedded JFreeChart pictures.
+      - `POST /generate-commercial`: Generates commercial proposal with BOQ and dynamic equipment costs.
+  - **Templates & Resources:**
+    - Bundled `COMMERCIAL PROPOSAL_33KV.docx`, `TECHNICAL PROPOSAL_11KV.docx`, and `commercial_proposal_template.docx` into `src/main/resources/templates/`.
+- **Test Results:**
+  - `ProposalAndDocumentIntegrationTest`: 4 tests passing:
+    - Commercial proposal generation with dynamic UP NPCL defaults returning valid `.docx` OpenXML binary with table structures intact.
+    - Technical proposal generation with JFreeChart picture embedding.
+    - Dual mount `/api/proposal/generate` route parity.
+    - Pure Java JFreeChart PNG rendering producing valid PNG magic bytes (`0x89 0x50 0x4E 0x47`).
+  - All tests passing with zero failures.
+
 
