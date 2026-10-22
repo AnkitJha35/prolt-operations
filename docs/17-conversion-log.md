@@ -184,4 +184,36 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Testcontainers lifecycle upgraded to singleton static container in `BaseIntegrationTest`.
   - All 33/33 tests passing cleanly.
 
+### Phase 4: Tariff Engine & Calculation Services
+- **Completed At:** 2026-10-22 17:55
+- **Scope & What Was Built:**
+  - **DTO Records (com.sense.prolt_operations.dto.calculator):**
+    - `LandedCostCalcRequest`: input payload for scenario `CALC-01` (`clientName`, `state`, `tariffCategory`, `contractDemandKva`, `connectedVoltage`, `consumptionKwh`, `monthYear`).
+    - `LandedCostCalcResponse`: response shape with `discomBillAmount`, `iexTotalCost`, `totalSavings`, `percentageSavings`, and breakdown (`energyCost`, `ctuLossAndCharges`, `stLossAndCharges`, `crossSubsidySurcharge`, `additionalSurcharge`).
+    - `CreateSavingsEntryDTO`, `SavingsEntryDTO`, `ResourceDefaultsResponse`, `DailyConsumerConfigDTO`, `DailyAnalysisRequestDTO`.
+  - **Services (com.sense.prolt_operations.service):**
+    - `LandingPriceService`: Proxy client communicating with the external IEX Landed Cost Calculator API (`${app.iex-calculator-api-url}/api/v1/calculator`) with deterministic offline and exception fallbacks.
+    - `SavingsCalculatorService`: Core financial calculation engine v1 with `BigDecimal` calculations. Features `calculateDirect` matching scenario `CALC-01` down to 0.0001 Rupee parity, `CALC-01a` state validation, entry CRUD with history versioning on update, role-based deletion guard, 96-time-block market decisions, demand shift insights, and client overview.
+    - `SavingsCalculatorNewService`: Enterprise V2 calculation engine with dynamic `getResourceDefaults` resolving FPPA charges and state demand fixed charges.
+    - `TraderPerformanceService`: Energy trading analytics service, versioning, margin tracking, and native PDF extraction using Apache PDFBox replacing external Python scripts.
+    - `TraderPerformanceDailyService`: Daily portfolio analytics integrating StarRocks smart meter query interface, daily consumer profile store, and trade report ingestion.
+    - `ExcelExportService`: Pure Java streaming `.xlsx` spreadsheet generator using Apache POI XSSFWorkbook for savings analysis and demand shift reports with professional corporate formatting and styling.
+  - **Controllers (com.sense.prolt_operations.controller):**
+    - `LandingPriceCalcController`: `/api/landing-price-calc` (`/calculate`, `/consumer-category`, `/voltage`, `/tod-months`, `/tod-slots`).
+    - `SavingsCalculatorController`: `/api/savings-calculator` (`/calculate`, `/`, `/{id}`, `/{id}/overview`, `/{id}/history`, `/{id}/calculate`, `/{id}/calculate-market-decision`, `/{id}/demand-shift-insights`, `/{id}/export-excel`, `/{id}/demand-shift-insights/export-excel`).
+    - `SavingsCalculatorNewController`: `/api/savings-calculator-new` (`/entries`, `/entries/resource-defaults`, `/entries/{id}`, etc.).
+    - `TraderPerformanceController`: `/api/trader-performance` (`/upload`, `/resource-defaults`, `/{id}/calculate`, `/{id}/export-excel`, etc.).
+    - `TraderPerformanceDailyController`: `/api/trader-performance-daily` (`/meters`, `/consumers`, `/analysis`, `/upload`).
+  - **Repositories Updated:**
+    - `SavingsCalculatorEntryHistoryRepository`, `SavingsCalculatorNewEntryHistoryRepository`, `TraderPerformanceEntryHistoryRepository`: added `findByEntryIdOrderByVersionDesc`, `findByEntryIdAndVersion`, `deleteByEntryId`.
+- **Test Results:**
+  - `CalculationAndTariffIntegrationTest`: 6 tests passing verifying:
+    - `CALC-01`: Exact Acme Steel Mills landed cost computation matching expected bill amount, total cost, savings (3,105,000.00), percentage (29.50%), and 5-point breakdown.
+    - `CALC-01a`: Missing state validation returning 400 Bad Request with exact parity message `"State is required to calculate savings. Please edit this entry to select a state."`.
+    - Savings calculator CRUD, automatic version incrementing in history, overview, 96-block decisions, and POI Excel export validation.
+    - Savings calculator new resource defaults and calculations.
+    - Landing price calculator endpoints.
+    - Trader performance and daily smart meter analytics.
+  - Full test suite: All 39/39 tests passing cleanly (`BUILD SUCCESS`).
+
 
