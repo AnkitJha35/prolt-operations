@@ -26,6 +26,17 @@ This document tracks the execution status of each phase defined in `14-target-ar
 | Hardening 8 | Trader performance user auditing | Done | 2026-10-23 12:20 | Safe null principal handling, exact `createdBy`/`updatedBy` parity (null when unauthenticated), `TraderPerformanceAuditingIntegrationTest` (4 tests) |
 | Hardening 9 | Report Only: Fallbacks, substitute data, and route contract | Done | 2026-10-23 12:25 | Fully documented PDF script error handling, synthetic scraper blocks, template fallbacks, and 404 vs 401 route contract in `docs/16-conversion-questions.md` |
 
-**Total Integration Tests**: 82 passing tests across all modules.
+---
+
+## Ingestion & Data Integrity Phases
+
+| Ingestion | Title | Status | Completed At | Notes |
+|---|---|---|---|---|
+| Ingestion 1 | Secrets and defaults | Done | 2026-10-23 21:00 | Removed all credentials/secrets defaults from `application.properties`; dev defaults in `application-dev.properties`; `ProductionDatasourceValidator`; StarRocks blank host guard; SEC-08..SEC-11 tests |
+| Ingestion 2 | Scraper parity and row parsers | Done | 2026-10-23 21:30 | Pure row parsers (`parseDamRows`, etc.), Playwright options aligned with Puppeteer, removed `generateSyntheticBlocks`/jsoup/fixtures, REC persistence guard, `ScraperRowParserTest` |
+| Ingestion 3 | Trade report parser | Done | 2026-10-23 22:10 | Unified `TradeReportParser` in pure Java PDFBox with `setSortByPosition(true)`, removed fallback synthetic metadata, wired into `TraderPerformanceService` and `TraderPerformanceDailyService`, unit tests (`TradeReportParserTest`), golden comparison against all 28 real PDFs (`TradeReportGoldenComparisonTest`) |
+| Ingestion 4 | Verification and final progress | Done | 2026-10-23 22:15 | Offline `./mvnw clean verify` passing; verified git grep absence of removed secrets/hosts, synthetic blocks, offline mode, fixtures, and jsoup; updated progress tracking |
+
+**Total Integration & Unit Tests**: 102 passing tests across all modules (1 skipped live manual test).
 
 

@@ -469,3 +469,17 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Added automated golden comparison test in `TradeReportGoldenComparisonTest.java` executing against all 28 real sample PDFs in `IEX-Dashboard/pdfs` with deep parity assertion (strings trimmed equal, floats within 1e-4 tolerance).
   - Documented results and comparison details in `docs/16-conversion-questions.md` Section 10.
 
+### Ingestion 4: Verification and final progress
+- **Date**: 2026-10-23
+- **Actions**:
+  - Executed offline `./mvnw clean verify`: all 102 tests passing cleanly with zero failures and zero errors (`BUILD SUCCESS`).
+  - Ran `git grep` verification across the codebase to ensure complete elimination of:
+    - Default credentials, tokens, and production hostnames from `src/main/resources/application.properties`
+    - `generateSyntheticBlocks` (eliminated from `ScraperService`)
+    - `"Offline Mode"` and synthetic fixture execution branches
+    - `dam_sample.html` (deleted from test resources)
+    - `jsoup` library dependency (removed from `pom.xml` and all java classes)
+  - Updated `README.md` to reflect the current test suite, architecture, and route catalog.
+  - Updated progress tracking in `docs/18-progress.md` with complete documentation for all 4 ingestion sections.
+
+

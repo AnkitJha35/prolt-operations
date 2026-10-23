@@ -151,11 +151,10 @@ All endpoints maintain 1:1 route signature, method, and query param parity with 
 - `POST /api/trader-performance/upload` - Apache PDFBox trade report ingestion
 - `POST /api/trader-performance-daily/upload` - Daily trader telemetry ingestion
 
-### 5. Document & Proposal Generation (`/api/proposals`, `/api/proposal`)
+### 5. Document & Proposal Generation (`/api/proposals`)
 - `POST /api/proposals/generate` - Generate generic Word (`.docx`) proposal
 - `POST /api/proposals/generate-technical` - Generate technical proposal with embedded JFreeChart pictures
 - `POST /api/proposals/generate-commercial` - Generate commercial proposal with dynamic BOQ injection
-- *(Dual mounted at `/api/proposal/**` for legacy compatibility)*
 
 ### 6. Resource Center Master Tables (`/api/resource-center`)
 - Supported resources: `region-state`, `discom-list`, `ists-charges`, `iex-fees`, `prolt-margin`, `ctu-charges`, `state-charges`, `state-tariff`, `fppa-charges`.
@@ -178,8 +177,8 @@ All endpoints maintain 1:1 route signature, method, and query param parity with 
 - `GET /api/forecast/demand` - Consumer & national demand forecast
 - `GET /api/forecast/generation` - Solar and wind generation forecast
 
-### 8. System Logging & Health (`/api/logs`, `/api/api-log`, `/health`, `/actuator`)
-- `GET /api/logs` & `GET /api/api-log` - System API access logs & execution metrics
+### 8. System Logging & Health (`/api/logs`, `/health`, `/actuator`)
+- `GET /api/logs` - System API access logs & execution metrics
 - `GET /health` - Base application health probe (`{"success": true, "status": "healthy"}`)
 - `GET /health/database` - Database connectivity probe (`{"success": true, "database": "connected"}`)
 - `GET /actuator/health` - Spring Actuator component health checks
@@ -200,15 +199,16 @@ The test suite leverages **Testcontainers** to spin up isolated PostgreSQL 16 in
 
 ### Key Integration Test Suites:
 1. `RepositoryIntegrationTest`: Flyway V1-V5 migration execution and entity CRUD operations.
-2. `AuthAndUserIntegrationTest`: JWT auth, Superadmin backdoor, rate limiting, and RBAC (`AUTH-01..03`, `USER-01`).
+2. `AuthAndUserIntegrationTest`: JWT auth, Superadmin bypass, rate limiting, and RBAC (`AUTH-01..03`, `USER-01`).
 3. `MarketAndScraperIntegrationTest`: 96-block ingestion, duplicate conflicts, and timeseries extraction (`DATA-01`, `SCRAPE-01`).
-4. `ScraperAndSchedulerIntegrationTest`: Offline Jsoup fixture parsing and AppScheduler cron routines.
-5. `CalculationAndTariffIntegrationTest`: Exact mathematical parity for open-access landed costs (`CALC-01`, `CALC-01a`).
-6. `ProposalAndDocumentIntegrationTest`: Apache POI Word generation and JFreeChart PNG rendering.
-7. `FullParityIntegrationTest`: End-to-end verification of all 7 remaining subsystems, health checks, and Prometheus metrics.
+4. `ScraperAndSchedulerIntegrationTest`: Scraper service parity, table row parsing, and AppScheduler cron routines.
+5. `TradeReportParserTest` & `TradeReportGoldenComparisonTest`: Pure Java trade report PDF extraction parity against 28 sample IEX PDFs.
+6. `CalculationAndTariffIntegrationTest`: Exact mathematical parity for open-access landed costs (`CALC-01`, `CALC-01a`).
+7. `ProposalAndDocumentIntegrationTest`: Apache POI Word generation and JFreeChart PNG rendering.
+8. `FullParityIntegrationTest`: End-to-end verification of all subsystems, health checks, and Prometheus metrics.
 
 **Test Run Metrics**:
-- **Total Tests**: 51
+- **Total Tests**: 102
 - **Failures**: 0
 - **Errors**: 0
 - **Pass Rate**: 100%
