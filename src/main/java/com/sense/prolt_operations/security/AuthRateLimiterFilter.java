@@ -1,17 +1,14 @@
 package com.sense.prolt_operations.security;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,24 +17,50 @@ import jakarta.servlet.http.HttpServletResponse;
 @Component
 public class AuthRateLimiterFilter extends OncePerRequestFilter {
 
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final FixedWindowRateLimiter limiter;
 
-    private Bucket createNewBucket() {
-        Bandwidth limit = Bandwidth.classic(10, Refill.greedy(10, Duration.ofMinutes(15)));
-        return Bucket.builder().addLimit(limit).build();
+    @Value("${app.rate-limit.legacy-headers:false}")
+    private boolean legacyHeaders;
+
+    public AuthRateLimiterFilter(Clock clock) {
+        this.limiter = new FixedWindowRateLimiter(Duration.ofMinutes(15), 10, clock);
+    }
+
+    public FixedWindowRateLimiter getLimiter() {
+        return limiter;
+    }
+
+    public void setClock(Clock clock) {
+        this.limiter.setClock(clock);
+    }
+
+    public void setLegacyHeaders(boolean legacyHeaders) {
+        this.legacyHeaders = legacyHeaders;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String uri = request.getRequestURI();
-        if (isRateLimitedAuthRoute(uri)) {
-            String clientIp = resolveClientIp(request);
-            Bucket bucket = buckets.computeIfAbsent(clientIp, k -> createNewBucket());
+        if (isRateLimitedAuthRoute(request)) {
+            String clientIp = ClientIpResolver.resolveClientIp(request);
+            // Single shared counter per client IP across POST /login, POST /send-otp, POST /verify-otp
+            FixedWindowRateLimiter.RateLimitResult result = limiter.tryAcquire(clientIp);
 
-            if (!bucket.tryConsume(1)) {
+            // Set standard headers matching express-rate-limit (standardHeaders: true)
+            response.setHeader("RateLimit-Limit", String.valueOf(result.limit()));
+            response.setHeader("RateLimit-Remaining", String.valueOf(result.remaining()));
+            response.setHeader("RateLimit-Reset", String.valueOf(result.resetSeconds()));
+
+            if (legacyHeaders) {
+                response.setHeader("X-RateLimit-Limit", String.valueOf(result.limit()));
+                response.setHeader("X-RateLimit-Remaining", String.valueOf(result.remaining()));
+                response.setHeader("X-RateLimit-Reset", String.valueOf(result.resetSeconds()));
+            }
+
+            if (!result.allowed()) {
                 response.setStatus(429);
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setHeader("Retry-After", String.valueOf(result.retryAfterSeconds()));
                 response.getWriter().write("{\"success\":false,\"message\":\"Too many login attempts, please try again after 15 minutes\"}");
                 return;
             }
@@ -46,18 +69,14 @@ public class AuthRateLimiterFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean isRateLimitedAuthRoute(String uri) {
-        if (uri == null) return false;
-        return uri.equals("/api/auth/login") ||
-               uri.equals("/api/auth/send-otp") ||
-               uri.equals("/api/auth/verify-otp");
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
+    private boolean isRateLimitedAuthRoute(HttpServletRequest request) {
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return false;
         }
-        return request.getRemoteAddr();
+        String uri = request.getRequestURI();
+        if (uri == null) return false;
+        return uri.equals("/api/auth/login") || uri.equals("/api/auth/login/") ||
+               uri.equals("/api/auth/send-otp") || uri.equals("/api/auth/send-otp/") ||
+               uri.equals("/api/auth/verify-otp") || uri.equals("/api/auth/verify-otp/");
     }
 }

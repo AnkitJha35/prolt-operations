@@ -325,6 +325,24 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - SuperAdmin route group rejects no token (401), bad token (401), non-superadmin (403 `{"success":false,"message":"Forbidden: Super Admin access required"}`), and permits superadmin (200).
     - Scraper `/sync` requires auth (401 without token) and `/import` enforces constant-time webhook secret (401 `{"success":false,"message":"Unauthorized"}`).
 
+### Hardening 4: Fixed-window rate limiting parity
+- **Date**: 2026-10-23
+- **Actions**:
+  - Replaced Bucket4j token bucket implementation with `FixedWindowRateLimiter` matching Express `express-rate-limit` semantics: fixed window counter that starts on first request and resets cleanly upon window expiration without leaking tokens linearly.
+  - Implemented `ClientIpResolver` matching Node's `app.set('trust proxy', 1)`: accurately parses `X-Forwarded-For` and extracts the **last** entry (the client IP seen by the immediate reverse proxy, Nginx), falling back to `request.getRemoteAddr()`. Protects against spoofed client IP headers in first position.
+  - Configured `AuthRateLimiterFilter`: 15-minute window, max 10 requests, with a single shared counter per client IP spanning `POST /api/auth/login`, `POST /api/auth/send-otp`, and `POST /api/auth/verify-otp`. Sets RFC standard headers `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and `Retry-After` on HTTP 429.
+  - Implemented `UploadRateLimiterFilter`: 1-hour window, max 30 requests on `POST /api/uploads`, positioned after authentication so unauthenticated requests fail with 401 without consuming quota, while `GET /api/uploads/health` is excluded from rate limiting.
+  - Removed obsolete Bucket4j dependencies from `pom.xml`.
+  - Added `ClockConfig` providing an injectable `Clock` for deterministic time manipulation in tests.
+  - Created `RateLimitingParityIntegrationTest` verifying:
+    - 10 requests succeed, 11th returns HTTP 429 with `RateLimit-*` and `Retry-After` headers.
+    - Advancing clock by 15 minutes cleanly resets the counter.
+    - Single shared counter applies across `/login`, `/send-otp`, and `/verify-otp`.
+    - Distinct client IPs maintain independent counters.
+    - Spoofed first IP in `X-Forwarded-For` is ignored in favor of the authentic last IP.
+    - Upload limiter enforces 30-request threshold on `POST /api/uploads` and leaves `GET /api/uploads/health` unthrottled.
+
+
 
 
 

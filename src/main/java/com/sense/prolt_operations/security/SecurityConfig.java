@@ -25,16 +25,19 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthRateLimiterFilter authRateLimiterFilter;
+    private final UploadRateLimiterFilter uploadRateLimiterFilter;
     private final RestAuthenticationEntryPoint authEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthFilter,
             AuthRateLimiterFilter authRateLimiterFilter,
+            UploadRateLimiterFilter uploadRateLimiterFilter,
             RestAuthenticationEntryPoint authEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authRateLimiterFilter = authRateLimiterFilter;
+        this.uploadRateLimiterFilter = uploadRateLimiterFilter;
         this.authEntryPoint = authEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
     }
@@ -94,7 +97,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(authRateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(uploadRateLimiterFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

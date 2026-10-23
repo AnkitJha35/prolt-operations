@@ -22,7 +22,6 @@
 		<jsoup.version>1.18.3</jsoup.version>
 		<commons-csv.version>1.12.0</commons-csv.version>
 		<shedlock.version>5.16.0</shedlock.version>
-		<bucket4j.version>8.15.0</bucket4j.version>
 		<jfreechart.version>1.5.5</jfreechart.version>
 	</properties>
 
@@ -151,12 +150,7 @@
 			<version>${jfreechart.version}</version>
 		</dependency>
 
-		<!-- Rate Limiting & Schedulers -->
-		<dependency>
-			<groupId>com.bucket4j</groupId>
-			<artifactId>bucket4j_jdk17-core</artifactId>
-			<version>${bucket4j.version}</version>
-		</dependency>
+		<!-- Schedulers -->
 		<dependency>
 			<groupId>net.javacrumbs.shedlock</groupId>
 			<artifactId>shedlock-spring</artifactId>
