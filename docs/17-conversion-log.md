@@ -359,6 +359,21 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - File exceeding 25MB on trader performance daily returns HTTP 400 `{"success":false,"message":"File too large"}`.
     - Unsupported file extension on `/api/uploads` is rejected with HTTP 400 matching Node multer filter.
 
+### Hardening 6: Actuator, Swagger and security headers
+- **Date**: 2026-10-23
+- **Actions**:
+  - `application.properties`: Restricted Actuator exposure to `health,info,prometheus`. Explicitly excluded and disabled sensitive endpoints (`env`, `heapdump`, `loggers`, `threaddump`). Configured `management.endpoint.health.show-details=never`.
+  - `application-dev.properties`: Configured `management.endpoint.health.show-details=when-authorized`.
+  - `application-prod.properties`: Explicitly disabled Swagger UI and OpenAPI documentation via `springdoc.swagger-ui.enabled=false` and `springdoc.api-docs.enabled=false`, with `management.endpoint.health.show-details=never`.
+  - `SwaggerConfig`: Annotated with `@Profile("!prod")` to prevent Swagger and OpenAPI beans from initializing in production.
+  - `SecurityConfig`: Configured complete Helmet security headers parity: `Content-Security-Policy` (exact directives without `upgrade-insecure-requests`), `X-Frame-Options` (`SAMEORIGIN`), `Referrer-Policy` (`no-referrer`), `Cross-Origin-Opener-Policy` (`same-origin`), `Cross-Origin-Resource-Policy` (`same-origin`), `Origin-Agent-Cluster` (`?1`), `X-DNS-Prefetch-Control` (`off`), `X-Download-Options` (`noopen`), `X-Permitted-Cross-Domain-Policies` (`none`), and `nosniff`/`0` protection.
+  - Documented header comparison and Actuator settings in `docs/16-conversion-questions.md` Section 4.
+  - Tests: Created `ActuatorAndSwaggerHardeningTest` and updated `ProfileSecurityDefaultsTest`:
+    - Verified all 11 security headers match Node Helmet exactly.
+    - Verified health and info are public, Prometheus requires authentication, and sensitive actuator endpoints return 401 unauthenticated and 404 authenticated.
+    - Verified prod profile disables Swagger and hides health details.
+
+
 
 
 

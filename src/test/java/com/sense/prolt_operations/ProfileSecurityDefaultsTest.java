@@ -105,4 +105,26 @@ class ProfileSecurityDefaultsTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("In production, app.jwt.secret must be provided and must be at least 32 bytes long");
     }
+
+    @Test
+    @DisplayName("SEC-06: Prod profile disables Swagger UI, API docs, and health details")
+    void testProdProfileSwaggerAndHealthSettings() throws Exception {
+        java.util.Properties prodProps = new java.util.Properties();
+        try (var is = getClass().getResourceAsStream("/application-prod.properties")) {
+            prodProps.load(is);
+        }
+        assertThat(prodProps.getProperty("springdoc.swagger-ui.enabled")).isEqualTo("false");
+        assertThat(prodProps.getProperty("springdoc.api-docs.enabled")).isEqualTo("false");
+        assertThat(prodProps.getProperty("management.endpoint.health.show-details")).isEqualTo("never");
+    }
+
+    @Test
+    @DisplayName("SEC-07: Dev profile enables health details for authorized callers")
+    void testDevProfileHealthSettings() throws Exception {
+        java.util.Properties devProps = new java.util.Properties();
+        try (var is = getClass().getResourceAsStream("/application-dev.properties")) {
+            devProps.load(is);
+        }
+        assertThat(devProps.getProperty("management.endpoint.health.show-details")).isEqualTo("when-authorized");
+    }
 }

@@ -52,6 +52,13 @@ public class SecurityConfig {
                     .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: validator.swagger.io https:")
                 )
                 .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                .referrerPolicy(ref -> ref.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
+                .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-origin"))
+                .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("Origin-Agent-Cluster", "?1"))
+                .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("X-DNS-Prefetch-Control", "off"))
+                .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("X-Download-Options", "noopen"))
+                .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("X-Permitted-Cross-Domain-Policies", "none"))
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(ex -> ex

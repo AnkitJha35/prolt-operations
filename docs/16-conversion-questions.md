@@ -76,6 +76,33 @@ The following table reflects a 100% comprehensive audit across all 18 route file
     - Exceeding 50MB returns HTTP 400 `{"success":false,"message":"File size exceeds the 50MB limit."}`.
 - **Exception Translation**: `RestControllerAdvisor.handleMaxUploadSizeExceededException` intercepts Spring's global `MaxUploadSizeExceededException` and formats HTTP 400 responses matching Node's Multer error format.
 
+---
+
+## 4. Actuator, Swagger, and Security Headers Parity
+
+### Actuator & Swagger
+- `management.endpoints.web.exposure.include=health,info,prometheus`: Exposed endpoints restricted to health, info, and prometheus metrics.
+- Excluded and disabled sensitive endpoints (`env`, `heapdump`, `loggers`, `threaddump`) across all profiles. Unauthenticated requests to sensitive endpoints fail with 401 Unauthorized; authenticated requests receive 404 Not Found.
+- `management.endpoint.health.show-details`: Configured as `never` in production (`application-prod.properties`) and `when-authorized` in development (`application-dev.properties`).
+- Swagger UI (`/swagger-ui/**`) and OpenAPI specification (`/v3/api-docs/**`): Disabled in production via `springdoc.swagger-ui.enabled=false`, `springdoc.api-docs.enabled=false`, and `@Profile("!prod")` on `SwaggerConfig`.
+
+### Security Headers Parity: Node Helmet vs Spring Security
+| Header | Node (Helmet v8) | Spring Security (Configured) | Parity Status |
+|---|---|---|---|
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: validator.swagger.io https:` | Configured via `.contentSecurityPolicy(...)` with identical directives | Exact Match |
+| `X-Frame-Options` | `SAMEORIGIN` | `.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)` | Exact Match |
+| `X-Content-Type-Options` | `nosniff` | Emitted by default by Spring Security | Exact Match |
+| `X-XSS-Protection` | `0` | Emitted by default by Spring Security | Exact Match |
+| `Referrer-Policy` | `no-referrer` | `.referrerPolicy(NO_REFERRER)` | Exact Match |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Configured via `StaticHeadersWriter` | Exact Match |
+| `Cross-Origin-Resource-Policy` | `same-origin` | Configured via `StaticHeadersWriter` | Exact Match |
+| `Origin-Agent-Cluster` | `?1` | Configured via `StaticHeadersWriter` | Exact Match |
+| `X-DNS-Prefetch-Control` | `off` | Configured via `StaticHeadersWriter` | Exact Match |
+| `X-Download-Options` | `noopen` | Configured via `StaticHeadersWriter` | Exact Match |
+| `X-Permitted-Cross-Domain-Policies` | `none` | Configured via `StaticHeadersWriter` | Exact Match |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Standard Spring Security HSTS on HTTPS requests | Exact Match |
+
+
 
 
 
