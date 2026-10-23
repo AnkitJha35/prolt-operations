@@ -411,6 +411,16 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Unauthenticated update sets `updatedBy = null` while preserving original `createdBy`.
     - Authenticated update sets `updatedBy = "updaterUser"` while preserving original `createdBy`.
 
+### Hardening 9: Report only - Fallbacks, substitute data, and route contract
+- **Date**: 2026-10-23
+- **Actions**:
+  - Investigated and documented in `docs/16-conversion-questions.md` Section 7:
+    - Python trade report script failure vs PDF parser fallback in `TraderPerformanceService`: Confirmed Node fails with HTTP 500 when `parse_trade_report.py` fails (or returns `status: "FAILURE"` per file), whereas Spring currently substitutes hardcoded fallback metadata on `Exception`.
+    - Inventory of other places returning substitute data: `ScraperService` synthetic 96 blocks, `ProposalService` blank proposal template fallback, `SavingsCalculatorService` hardcoded financial figures in `calculateDirect`, and `TraderPerformanceService` static cost constants in `getClientOverview`, `calculateSavings`, and `calculateMarketDecision`.
+    - Express 404 vs Spring Security 401 unauthenticated route resolution: Documented the intentional fail-closed security decision that returns 401 for unauthenticated requests on non-existent endpoints.
+  - Updated `docs/18-progress.md` with complete tracking for all 9 hardening phases.
+
+
 
 
 

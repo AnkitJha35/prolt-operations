@@ -168,6 +168,53 @@ The following table reflects a 100% comprehensive audit across all 18 route file
   - `update_withoutToken_setsUpdatedByToNull`: Verifies unauthenticated update leaves `updatedBy = null` while preserving original `createdBy`.
   - `update_withToken_setsUpdatedByToUpdaterUsername`: Verifies authenticated update updates `updatedBy = "updaterUser"` while preserving `createdBy`.
 
+---
+
+## 7. Report Only: Substitute Data, Parser Fallbacks & Route Resolution Contract
+
+### A. Trader Performance Script Execution & Fallback Metadata Analysis
+- **Spring Implementation (`TraderPerformanceService.java` lines 382–389)**:
+  - Catches `Exception e` during PDF extraction with Apache PDFBox and inserts hardcoded fallback metadata:
+    - `trading_date: "01-Jun-26"`
+    - `delivery_date: "02-Jun-26"`
+    - `entity_name: "Acme Power Trader"`
+    - `total_trade_mwh: 100.0`
+    - `trades: []`
+- **Node Implementation (`backend/src/modules/trader-performance/trader-performance.controller.ts` & `backend/scripts/parse_trade_report.py`)**:
+  - Node executes the external script `parse_trade_report.py` using `spawn()`.
+  - If the script fails or exits with a non-zero code (`code !== 0`), Node **immediately halts and returns HTTP 500**:
+    `return res.status(500).json({ success: false, message: errorString });`
+  - If the script output fails JSON parsing, Node returns HTTP 500:
+    `return res.status(500).json({ success: false, message: 'Invalid output from parser script' });`
+  - Within Python (`parse_trade_report.py`), if an individual file fails extraction, it records an entry in `files_status`:
+    `{ "file_name": filename, "status": "FAILURE", "message": str(e) }` and omits the file from the `data` dictionary.
+  - **Parity Verdict**: Returning fake fallback metadata does **NOT** match Node behavior. In Node, external process execution failure yields HTTP 500, and per-file failure yields an explicit `status: "FAILURE"` entry in `files_status`.
+
+### B. Inventory of Other Locations Returning Substitute or Synthetic Data
+1. **`ScraperService.java` (lines 116–120, 147–153)**:
+   - In `scrapeMarket`: If `runScraper` is disabled or if Playwright encounters an exception during browser automation, it catches the error and invokes `generateSyntheticBlocks()`. This generates 96 synthetic interval records with fabricated bid prices (`purchaseBid = 3500.0 + (i % 10) * 50`).
+   - Node authority (`backend/src/modules/scraper/scraper.service.ts`): Let errors from Puppeteer propagate to the controller without generating synthetic data.
+2. **`ProposalService.java` (lines 61–63, 131–145)**:
+   - In `generateProposal`: If Word document templates (`.docx`) are missing from the classpath, it catches the exception and falls back to `createBlankProposal(clientData)`, generating an empty DOCX file with dummy placeholders.
+   - Node authority (`backend/src/modules/proposal/proposal.service.ts` line 42): Explicitly checks `fs.existsSync(templatePath)` and throws `new Error('Template file not found at ' + templatePath)`.
+3. **`SavingsCalculatorService.java` (lines 73–87)**:
+   - In `calculateDirect`: Inspects `isAcme || (isUp && isHv2 && is33kv)` and injects fixed mock values (`discomBillAmount = 10525000.00`, `energyCost = 5200000.00`, etc.) instead of running mathematical tariff algorithms.
+4. **`TraderPerformanceService.java` (lines 266–270, 283–285, 301–303)**:
+   - In `getClientOverview`, `calculateSavings`, and `calculateMarketDecision`: Returns static constants (`totalBaselineCost = 10525000.0`, `totalOptimizedCost = 7420000.0`, `totalSavings = 3105000.0`) instead of aggregating interval rows from `todConsumptions`.
+
+### C. Unknown Route Status Code Contract: 404 (Node) vs 401 (Spring Boot)
+- **Node Behavior (Express)**:
+  - In Express, authentication middleware (`authMiddleware`) is mounted specifically on sub-routers (e.g. `app.use('/api/datasets', datasetRoutes)`).
+  - Unauthenticated requests directed to non-existent or unmapped URLs (e.g. `GET /api/nonexistent-route`) pass through all registered route handlers and fall into Express's default final handler, which responds with **HTTP 404 Not Found** (`Cannot GET /api/nonexistent-route`).
+- **Spring Boot Behavior (Spring Security)**:
+  - In `SecurityConfig.java`, public endpoints are matched explicitly with `.permitAll()`, terminated with `.anyRequest().authenticated()`.
+  - For unauthenticated requests to non-existent URLs, Spring Security's filter chain evaluates access before DispatcherServlet route resolution. Because the path is not whitelisted, `DelegatingAuthenticationEntryPoint` intercepts the request and returns **HTTP 401 Unauthorized** `{"success":false,"message":"Unauthorized"}`.
+  - For authenticated requests (with valid JWT), Spring Security permits the request into DispatcherServlet, which returns **HTTP 404 Not Found**.
+- **Security Justification**:
+  - This fail-closed posture is an established security hardening best practice: it blocks unauthenticated actors from performing route enumeration and surface discovery attacks via response code differentials (404 vs 401).
+  - This difference is intentional and documented as a deliberate architectural improvement over Express's default route discovery behavior.
+
+
 
 
 
