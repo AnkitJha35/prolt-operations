@@ -19,16 +19,16 @@ public class StarrocksService {
 
     private static final Logger log = LoggerFactory.getLogger(StarrocksService.class);
 
-    @Value("${app.starrocks.host:prolt-prod-starrocks.probussense.com}")
+    @Value("${app.starrocks.host:}")
     private String host;
 
     @Value("${app.starrocks.port:9030}")
     private int port;
 
-    @Value("${app.starrocks.user:read_only_user}")
+    @Value("${app.starrocks.user:}")
     private String user;
 
-    @Value("${app.starrocks.password:Probus@123}")
+    @Value("${app.starrocks.password:}")
     private String password;
 
     @Value("${app.starrocks.database:prolt_hes_db}")
@@ -40,6 +40,10 @@ public class StarrocksService {
     }
 
     public List<String> getAvailableMeters() {
+        if (host == null || host.isBlank()) {
+            log.warn("StarRocks host is blank; skipping connection.");
+            return java.util.Collections.emptyList();
+        }
         List<String> meters = new ArrayList<>();
         String sql = "SELECT DISTINCT meter_number FROM prolt_load_data WHERE meter_number IS NOT NULL AND meter_number != ''";
         try (Connection conn = getConnection();
@@ -55,6 +59,10 @@ public class StarrocksService {
     }
 
     public Map<String, Double> getConsumerActualDemandMap(List<String> dates, String meterNo) {
+        if (host == null || host.isBlank()) {
+            log.warn("StarRocks host is blank; skipping connection.");
+            return java.util.Collections.emptyMap();
+        }
         Map<String, Double> actualMap = new HashMap<>();
         if (dates == null || dates.isEmpty()) return actualMap;
 

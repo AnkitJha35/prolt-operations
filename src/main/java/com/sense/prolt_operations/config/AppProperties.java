@@ -15,15 +15,15 @@ public class AppProperties {
     private List<String> corsOrigins = new ArrayList<>();
     private boolean runScraper = false;
     private List<String> webhookReceivers = new ArrayList<>();
-    private String webhookSecret = "super_secret_webhook_token_123";
+    private String webhookSecret;
     private final Admin admin = new Admin();
     private final Mail mail = new Mail();
     private String accuweatherApiKey;
     private String iexCalculatorApiUrl;
-    private String puppeteerExecutablePath = "/usr/bin/chromium";
+    private String puppeteerExecutablePath;
     private final Starrocks starrocks = new Starrocks();
     private String backupDatabaseUrl;
-    private String redisUrl = "redis://localhost:6379";
+    private String redisUrl;
 
     public Jwt getJwt() {
         return jwt;
@@ -143,9 +143,9 @@ public class AppProperties {
     }
 
     public static class Admin {
-        private String username = "admin";
-        private String email = "admin@iexdashboard.local";
-        private String password = "admin";
+        private String username;
+        private String email;
+        private String password;
 
         public String getUsername() {
             return username;
@@ -185,10 +185,10 @@ public class AppProperties {
     }
 
     public static class Starrocks {
-        private String host = "prolt-prod-starrocks.probussense.com";
+        private String host;
         private int port = 9030;
-        private String user = "read_only_user";
-        private String password = "Probus@123";
+        private String user;
+        private String password;
         private String database = "prolt_hes_db";
 
         public String getHost() {

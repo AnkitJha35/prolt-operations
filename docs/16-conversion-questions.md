@@ -214,11 +214,19 @@ The following table reflects a 100% comprehensive audit across all 18 route file
   - This fail-closed posture is an established security hardening best practice: it blocks unauthenticated actors from performing route enumeration and surface discovery attacks via response code differentials (404 vs 401).
   - This difference is intentional and documented as a deliberate architectural improvement over Express's default route discovery behavior.
 
+---
 
+## 8. Removed Configuration Defaults (Credentials, Hosts, and Secrets)
 
+As part of the secrets and defaults hardening (Ingestion 1), all default values following colons for credentials, secrets, hostnames, and tokens were stripped from `src/main/resources/application.properties`:
 
+- **PostgreSQL Database**: Removed default values for `spring.datasource.url`, `spring.datasource.username`, and `spring.datasource.password`.
+- **Redis**: Removed default values for `spring.data.redis.url` and `app.redis-url` (`redis://localhost:6379`).
+- **StarRocks**: Removed default values for `app.starrocks.host` (`prolt-prod-starrocks.probussense.com`), `app.starrocks.user`, and `app.starrocks.password`.
+- **Authentication & Webhooks**: Removed default values for `app.webhook-secret` and `app.admin.*` (`ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+- **Puppeteer & Mail**: Removed default values for `app.puppeteer-executable-path` (`/usr/bin/chromium`), `spring.mail.host` (`localhost`), `spring.mail.username`, and `spring.mail.password`.
 
-
+Local development defaults have been moved into `src/main/resources/application-dev.properties` so `mvn spring-boot:run -Dspring-boot.run.profiles=dev` functions out of the box against local development infrastructure. Production enforces non-blank datasource properties via `ProductionDatasourceValidator`. Note: In accordance with zero-credential exposure security guidelines, raw secret strings have been sanitized and are not retained in git or docs.
 
 
 

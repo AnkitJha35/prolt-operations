@@ -14,13 +14,13 @@ public class AppRunner implements ApplicationRunner {
     private final com.sense.prolt_operations.repository.UserRepository userRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    @org.springframework.beans.factory.annotation.Value("${app.admin.username:admin}")
+    @org.springframework.beans.factory.annotation.Value("${app.admin.username:}")
     private String adminUsername;
 
-    @org.springframework.beans.factory.annotation.Value("${app.admin.email:admin@iexdashboard.local}")
+    @org.springframework.beans.factory.annotation.Value("${app.admin.email:}")
     private String adminEmail;
 
-    @org.springframework.beans.factory.annotation.Value("${app.admin.password:admin}")
+    @org.springframework.beans.factory.annotation.Value("${app.admin.password:}")
     private String adminPassword;
 
     public AppRunner(com.sense.prolt_operations.repository.UserRepository userRepository,
@@ -31,6 +31,10 @@ public class AppRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
+        if (adminUsername == null || adminUsername.isBlank() || adminPassword == null || adminPassword.isBlank()) {
+            log.info("AppRunner initialized (admin sync skipped, credentials not configured).");
+            return;
+        }
         userRepository.findByUsername(adminUsername).ifPresentOrElse(
             user -> {
                 if (user.getPasswordHash() == null || !passwordEncoder.matches(adminPassword, user.getPasswordHash())) {

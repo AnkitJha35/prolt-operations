@@ -420,11 +420,19 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Express 404 vs Spring Security 401 unauthenticated route resolution: Documented the intentional fail-closed security decision that returns 401 for unauthenticated requests on non-existent endpoints.
   - Updated `docs/18-progress.md` with complete tracking for all 9 hardening phases.
 
+## Ingestion & data integrity
 
-
-
-
-
+### Ingestion 1: Secrets and defaults
+- **Date**: 2026-10-23
+- **Actions**:
+  - Removed all hardcoded credentials, secret tokens, and host defaults following colons from `src/main/resources/application.properties` (PostgreSQL datasource, Redis, StarRocks, SMTP, Webhook secret, Admin credentials, Puppeteer executable path).
+  - Preserved environment variable placeholders without defaults (or with empty defaults where optional).
+  - Populated `src/main/resources/application-dev.properties` with localhost development defaults for database and redis so `mvn spring-boot:run -Dspring-boot.run.profiles=dev` continues to function out of the box.
+  - Implemented `ProductionDatasourceValidator` as a `BeanFactoryPostProcessor` registered under `@Profile("prod")` that inspects `spring.datasource.url`, `spring.datasource.username`, and `spring.datasource.password`, throwing an `IllegalStateException` naming the missing property if any are blank.
+  - Hardened `StarrocksService` to check if `app.starrocks.host` is blank/unset: logs a WARN and returns `Collections.emptyList()` for `query()` and `Map.of("connected", false, "reason", "host not configured")` for `testConnection()`, preventing startup exceptions and network calls.
+  - Excluded `UserDetailsServiceAutoConfiguration` in `@SpringBootApplication` and registered a no-op `UserDetailsService` bean in `SecurityConfig` to suppress generated default security password log pollution during tests.
+  - Sanitized hardcoded secrets and default values from `AppProperties.java`, `AppRunner.java`, `AuthenticationParityIntegrationTest.java`, and `BaseIntegrationTest.java`.
+  - Added unit and context runner tests (`SEC-08` through `SEC-11`) in `ProfileSecurityDefaultsTest.java` verifying that production fails when datasource properties are missing and that StarRocks safely handles blank hosts.
 
 
 

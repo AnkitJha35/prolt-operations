@@ -127,4 +127,65 @@ class ProfileSecurityDefaultsTest {
         }
         assertThat(devProps.getProperty("management.endpoint.health.show-details")).isEqualTo("when-authorized");
     }
+
+    @Test
+    @DisplayName("SEC-08: Production datasource validator fails startup if spring.datasource.url is blank")
+    void testProdDatasourceValidatorFailsIfUrlBlank() {
+        MockEnvironment env = new MockEnvironment();
+        env.setActiveProfiles("prod");
+        env.setProperty("spring.datasource.url", "");
+        env.setProperty("spring.datasource.username", "postgres");
+        env.setProperty("spring.datasource.password", "secret");
+
+        com.sense.prolt_operations.config.ProductionDatasourceValidator validator = new com.sense.prolt_operations.config.ProductionDatasourceValidator();
+        validator.setEnvironment(env);
+
+        assertThatThrownBy(() -> validator.postProcessBeanFactory(null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Production datasource URL (spring.datasource.url / DATABASE_URL) must not be blank!");
+    }
+
+    @Test
+    @DisplayName("SEC-09: Production datasource validator fails startup if spring.datasource.username is blank")
+    void testProdDatasourceValidatorFailsIfUsernameBlank() {
+        MockEnvironment env = new MockEnvironment();
+        env.setActiveProfiles("prod");
+        env.setProperty("spring.datasource.url", "jdbc:postgresql://localhost:5432/db");
+        env.setProperty("spring.datasource.username", "");
+        env.setProperty("spring.datasource.password", "secret");
+
+        com.sense.prolt_operations.config.ProductionDatasourceValidator validator = new com.sense.prolt_operations.config.ProductionDatasourceValidator();
+        validator.setEnvironment(env);
+
+        assertThatThrownBy(() -> validator.postProcessBeanFactory(null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Production datasource username (spring.datasource.username / POSTGRES_USER) must not be blank!");
+    }
+
+    @Test
+    @DisplayName("SEC-10: Production datasource validator fails startup if spring.datasource.password is blank")
+    void testProdDatasourceValidatorFailsIfPasswordBlank() {
+        MockEnvironment env = new MockEnvironment();
+        env.setActiveProfiles("prod");
+        env.setProperty("spring.datasource.url", "jdbc:postgresql://localhost:5432/db");
+        env.setProperty("spring.datasource.username", "postgres");
+        env.setProperty("spring.datasource.password", "");
+
+        com.sense.prolt_operations.config.ProductionDatasourceValidator validator = new com.sense.prolt_operations.config.ProductionDatasourceValidator();
+        validator.setEnvironment(env);
+
+        assertThatThrownBy(() -> validator.postProcessBeanFactory(null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Production datasource password (spring.datasource.password / POSTGRES_PASSWORD) must not be blank!");
+    }
+
+    @Test
+    @DisplayName("SEC-11: StarrocksService with blank host skips connection and returns empty list and map")
+    void testStarrocksServiceBlankHostSkipsConnection() {
+        com.sense.prolt_operations.service.StarrocksService starrocksService = new com.sense.prolt_operations.service.StarrocksService();
+        ReflectionTestUtils.setField(starrocksService, "host", "");
+
+        assertThat(starrocksService.getAvailableMeters()).isEmpty();
+        assertThat(starrocksService.getConsumerActualDemandMap(java.util.List.of("2026-06-01"), "M123")).isEmpty();
+    }
 }

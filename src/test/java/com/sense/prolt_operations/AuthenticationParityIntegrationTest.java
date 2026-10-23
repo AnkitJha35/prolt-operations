@@ -43,7 +43,7 @@ class AuthenticationParityIntegrationTest extends BaseIntegrationTest {
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${app.webhook-secret:super_secret_webhook_token_123}")
+    @Value("${app.webhook-secret}")
     private String webhookSecret;
 
     private String clientToken;
