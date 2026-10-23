@@ -43,8 +43,8 @@ public class TraderPerformanceController {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "File too large"));
             }
         }
-        List<Map<String, Object>> reports = traderPerformanceService.uploadTradeReports(files);
-        return ResponseEntity.ok(Map.of("success", true, "data", reports));
+        Map<String, Object> response = traderPerformanceService.uploadTradeReports(files);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping

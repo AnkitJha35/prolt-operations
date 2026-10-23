@@ -449,3 +449,23 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Deleted stale test fixture `src/test/resources/fixtures/dam_sample.html`.
   - Created pure unit tests in `ScraperRowParserTest.java` verifying row parsing, column index mappings, empty row skipping, and multi-format variants.
   - Added `ScraperLiveManualTest.java` annotated with `@Tag("live")` and `@Disabled` for on-demand live testing against IEX website.
+
+### Ingestion 3: Trade report parser
+- **Date**: 2026-10-23
+- **Actions**:
+  - Ported `IEX-Dashboard/backend/scripts/parse_trade_report.py` to a single unified Java parser `com.sense.prolt_operations.service.TradeReportParser` using Apache PDFBox.
+  - Retained exact regex patterns, Unicode character property flag `(?U)`, text cleaner (`cleanText`), label-to-key normalization (`normalizeKey`), string-to-float conversions (`toFloat`), and envelope structure (`files_status` and `reports`).
+  - Implemented `fileKey` formatted as `<epoch millis>-<filename>`.
+  - Configured `PDFTextStripper.setSortByPosition(true)` to match `pdfplumber`'s visual coordinate ordering.
+  - Wired `TradeReportParser` into `TraderPerformanceService` and `TraderPerformanceDailyService`, removing all synthetic fallback data (`01-Jun-26`, `Acme Power Trader`, `100.0` MWh, etc.). Unparseable files now record a `status: "FAILURE"` entry in `files_status`.
+  - Updated `TraderPerformanceController` and `TraderPerformanceDailyController` upload endpoints to return the unified response envelope with HTTP 200, matching Node parity while maintaining backward compatibility with `UploadLimitsIntegrationTest`.
+  - Added unit tests in `TradeReportParserTest.java` covering:
+    - CLIENT CODE / Entity ID
+    - CLIENT NAME / Entity Name
+    - TRADE DATE formats (DD-MM-YYYY, DD/MM/YYYY, DD-Mon-YY)
+    - SEGMENT / PRODUCT extraction
+    - Charges normalization (`&` to `and`, lowercase, underscores)
+    - Valid trades table, empty trades table, and malformed text error handling
+  - Added automated golden comparison test in `TradeReportGoldenComparisonTest.java` executing against all 28 real sample PDFs in `IEX-Dashboard/pdfs` with deep parity assertion (strings trimmed equal, floats within 1e-4 tolerance).
+  - Documented results and comparison details in `docs/16-conversion-questions.md` Section 10.
+

@@ -22,10 +22,12 @@ public class TraderPerformanceDailyService {
 
     private static final Logger log = LoggerFactory.getLogger(TraderPerformanceDailyService.class);
     private final StarrocksService starrocksService;
+    private final TradeReportParser tradeReportParser;
     private final Map<String, DailyConsumerConfigDTO> consumerStore = new ConcurrentHashMap<>();
 
-    public TraderPerformanceDailyService(StarrocksService starrocksService) {
+    public TraderPerformanceDailyService(StarrocksService starrocksService, TradeReportParser tradeReportParser) {
         this.starrocksService = starrocksService;
+        this.tradeReportParser = tradeReportParser;
         initDefaultConsumers();
     }
 
@@ -125,36 +127,7 @@ public class TraderPerformanceDailyService {
         return analysis;
     }
 
-    public List<Map<String, Object>> uploadDailyTradeReports(List<MultipartFile> files) {
-        List<Map<String, Object>> results = new ArrayList<>();
-        if (files == null) return results;
-
-        for (MultipartFile file : files) {
-            Map<String, Object> report = new HashMap<>();
-            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "trade_report.pdf";
-            report.put("filename", filename);
-
-            try (PDDocument document = Loader.loadPDF(file.getBytes())) {
-                PDFTextStripper stripper = new PDFTextStripper();
-                String text = stripper.getText(document);
-
-                Matcher mDate = Pattern.compile("Trading Date\\s*:\\s*(\\d{1,2}-\\w{3}-\\d{2,4})").matcher(text);
-                if (mDate.find()) report.put("trading_date", mDate.group(1));
-
-                Matcher mDeliv = Pattern.compile("Delivery Date\\s*:\\s*(\\d{1,2}-\\w{3}-\\d{2,4})").matcher(text);
-                if (mDeliv.find()) report.put("delivery_date", mDeliv.group(1));
-
-                report.put("total_traded_mw", 1.2);
-                report.put("cleared_price", 4.35);
-            } catch (Exception e) {
-                log.warn("[TraderPerformanceDailyService] Error parsing trade PDF: {}", e.getMessage());
-                report.put("trading_date", "01-Jun-26");
-                report.put("delivery_date", "02-Jun-26");
-                report.put("total_traded_mw", 1.0);
-                report.put("cleared_price", 4.50);
-            }
-            results.add(report);
-        }
-        return results;
+    public Map<String, Object> uploadDailyTradeReports(List<MultipartFile> files) {
+        return tradeReportParser.parseFiles(files);
     }
 }

@@ -33,8 +33,8 @@ public class TraderPerformanceDailyController {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "File too large"));
             }
         }
-        List<Map<String, Object>> reports = dailyService.uploadDailyTradeReports(files);
-        return ResponseEntity.ok(Map.of("success", true, "data", reports));
+        Map<String, Object> response = dailyService.uploadDailyTradeReports(files);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/meters")

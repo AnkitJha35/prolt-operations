@@ -40,18 +40,21 @@ public class TraderPerformanceService {
     private final FppaChargesRepository fppaChargesRepository;
     private final StateChargesRepository stateChargesRepository;
     private final ObjectMapper objectMapper;
+    private final TradeReportParser tradeReportParser;
 
     public TraderPerformanceService(
             TraderPerformanceEntryRepository entryRepository,
             TraderPerformanceEntryHistoryRepository historyRepository,
             FppaChargesRepository fppaChargesRepository,
             StateChargesRepository stateChargesRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            TradeReportParser tradeReportParser) {
         this.entryRepository = entryRepository;
         this.historyRepository = historyRepository;
         this.fppaChargesRepository = fppaChargesRepository;
         this.stateChargesRepository = stateChargesRepository;
         this.objectMapper = objectMapper;
+        this.tradeReportParser = tradeReportParser;
     }
 
     public ResourceDefaultsResponse getResourceDefaults(String stateCode, String discom, String consumerCategory, String voltageLevel, String monthStr) {
@@ -344,52 +347,8 @@ public class TraderPerformanceService {
         return response;
     }
 
-    public List<Map<String, Object>> uploadTradeReports(List<MultipartFile> files) {
-        List<Map<String, Object>> results = new ArrayList<>();
-        if (files == null) return results;
-
-        for (MultipartFile file : files) {
-            Map<String, Object> report = new HashMap<>();
-            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "report.pdf";
-            report.put("filename", filename);
-
-            if (filename.startsWith("RTM_IEX")) {
-                report.put("oa_market_type", "RTM");
-            } else if (filename.startsWith("GDAM_IEX")) {
-                report.put("oa_market_type", "GDAM");
-            } else {
-                report.put("oa_market_type", "DAM");
-            }
-
-            try (PDDocument document = Loader.loadPDF(file.getBytes())) {
-                PDFTextStripper stripper = new PDFTextStripper();
-                String text = stripper.getText(document);
-
-                Matcher mDate = Pattern.compile("Trading Date\\s*:\\s*(\\d{1,2}-\\w{3}-\\d{2,4})").matcher(text);
-                if (mDate.find()) {
-                    report.put("trading_date", mDate.group(1));
-                }
-                Matcher mDeliv = Pattern.compile("Delivery Date\\s*:\\s*(\\d{1,2}-\\w{3}-\\d{2,4})").matcher(text);
-                if (mDeliv.find()) {
-                    report.put("delivery_date", mDeliv.group(1));
-                }
-                Matcher mEntity = Pattern.compile("Entity Name\\s*:\\s*([^\\n\\r]+)").matcher(text);
-                if (mEntity.find()) {
-                    report.put("entity_name", mEntity.group(1).trim());
-                }
-                report.put("total_trade_mwh", 125.5);
-                report.put("trades", List.of());
-            } catch (Exception e) {
-                log.warn("[TraderPerformanceService] Could not parse PDF {}, using fallback metadata: {}", filename, e.getMessage());
-                report.put("trading_date", "01-Jun-26");
-                report.put("delivery_date", "02-Jun-26");
-                report.put("entity_name", "Acme Power Trader");
-                report.put("total_trade_mwh", 100.0);
-                report.put("trades", List.of());
-            }
-            results.add(report);
-        }
-        return results;
+    public Map<String, Object> uploadTradeReports(List<MultipartFile> files) {
+        return tradeReportParser.parseFiles(files);
     }
 
     private void copyToHistory(TraderPerformanceEntry source, TraderPerformanceEntryHistory target, int version) {

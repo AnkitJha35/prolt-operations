@@ -238,3 +238,31 @@ Local development defaults have been moved into `src/main/resources/application-
   - `RecRecord` entity and `RecRecordRepository` exist in the codebase, but `PersistenceService.insertMarketRecords` does not yet contain the monthly batch persistence logic for `MarketType.REC`.
 - **Parity Decision**:
   - In `ScraperController.triggerScraper` (`POST /api/scraper/sync`), if `market=REC` is requested, the endpoint immediately returns HTTP 500 with `{"success": false, "message": "REC persistence not yet ported"}` and logs the event to `apiLogService`. This prevents unpersisted scraping attempts from succeeding silently or dropping data.
+
+---
+
+## 10. Trade Report Parser: Parity and Golden Comparison Results
+
+### A. Architecture and Porting
+- **Node Authority**: Node executes `IEX-Dashboard/backend/scripts/parse_trade_report.py` via `child_process.spawn()` in `trader-performance.controller.ts` and `trader-performance-daily.controller.ts`. The Python script relies on `pdfplumber` to extract page text and regular expressions to parse trading/delivery dates, entities, portfolios, financial charges, funds payin/payout, total amount, trade MWh, and 96-interval block trades.
+- **Java Port**: Created `com.sense.prolt_operations.service.TradeReportParser` in pure Java using Apache PDFBox (`PDFTextStripper`).
+  - Faithfully reproduced the regex patterns, Unicode character properties flag `(?U)`, string cleaning (`cleanText`), JSON-friendly charge key normalization (`normalizeKey`), string-to-float conversions (`toFloat`), and envelope construction (`files_status` and `reports`).
+  - Implemented `fileKey` attribute with format `<epoch millis>-<filename>`.
+  - Injected `TradeReportParser` into both `TraderPerformanceService` and `TraderPerformanceDailyService`, delegating multipart PDF parsing directly.
+  - Completely removed hardcoded fallback metadata (`trading_date: "01-Jun-26"`, `entity_name: "Acme Power Trader"`, `total_trade_mwh: 100.0`, etc.) from both services. Unparseable files now record a `status: "FAILURE"` entry with the exception message in `files_status`, matching Node parity.
+
+### B. Golden Comparison Results (28 Sample PDFs)
+- Evaluated against all 28 real sample trade report PDFs located in `IEX-Dashboard/pdfs` (`DAM_04-08-2026.pdf`, `DAM_14-08-2026.pdf`, `RTM_01-08-2026.pdf` through `RTM_31-08-2026.pdf`).
+- Automated integration test `TradeReportGoldenComparisonTest.java` executes `uv run --with pdfplumber python3 parse_trade_report.py` on each PDF and verifies deep equality against `TradeReportParser.parsePdfFile(pdf)`.
+- **Validation Metrics**:
+  - **Strings trimmed equal**: `trading_date`, `delivery_date`, `entity_id`, `entity_name`, `portfolio_code`, `portfolio_name`, `oa_market_type`, `remarks`.
+  - **Numeric totals within 1e-4**: `funds_payin_payout`, `total_amount`, `total_trade_mwh`.
+  - **Charges map**: Every normalized key and absolute amount verified identical within 1e-4 tolerance.
+  - **Trades list**: Interval count (e.g., 96 blocks) and individual block values (`period`, `qty_mw`, `rate_mwh`, `amount`) verified identical within 1e-4 tolerance.
+  - **Overall Parity**: 28 out of 28 sample PDFs passed with 100% deep equality.
+
+### C. Technical Notes & Deviations
+- **Text Sorting in PDFBox**: PDFBox's default text stripper order (`setSortByPosition(false)`) follows PDF stream chunk ordering, which placed headers on separate lines from values (e.g. `3-Aug-26Trading Date`). Setting `stripper.setSortByPosition(true)` instructs PDFBox to sort text chunks visually by vertical and horizontal coordinates, matching `pdfplumber` page layout extraction exactly.
+- **Multilingual / Extended Date Format Support**: In addition to standard IEX format (`DD-Mon-YY`), `TradeReportParser` also accepts `DD-MM-YYYY` and `DD/MM/YYYY` formats with `Trading Date` or `TRADE DATE`, as well as `Entity ID` and `CLIENT CODE`.
+- **Upload Response Envelope**: For upload endpoints (`POST /api/trader-performance/upload` and `POST /api/trader-performance-daily/upload`), the unified response structure returns HTTP 200 with `success: true`, `data: files_status` (maintaining backward compatibility with part-count and list assertions in `UploadLimitsIntegrationTest`), `reports: results` (map of filename to parsed data), `files_status: files_status`, and `summary: { total_files, successful_files, failed_files }`.
+
