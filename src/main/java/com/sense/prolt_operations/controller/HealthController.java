@@ -30,13 +30,11 @@ public class HealthController {
 
     @GetMapping("/health/database")
     @Operation(summary = "Database readiness probe", description = "Checks database connectivity")
-    public ResponseEntity<Map<String, Object>> healthDatabase() {
+    public ResponseEntity<Map<String, Object>> healthDatabase() throws Exception {
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("SELECT 1");
             return ResponseEntity.ok(Map.of("success", true, "database", "connected"));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("success", false, "database", "disconnected", "error", e.getMessage()));
         }
     }
 }

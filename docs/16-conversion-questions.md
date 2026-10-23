@@ -28,6 +28,36 @@ This document records any ambiguities, discrepancies, edge cases, or known Node.
 - **Quirk Description**: Standard hierarchical RBAC usually implies `SUPER_ADMIN` possesses a superset of `ADMIN` capabilities. However, in the Node.js implementation, `adminMiddleware` tests strictly for exact string equality with `'ADMIN'`, therefore returning `403 Forbidden` if a user with role `SUPER_ADMIN` attempts to access routes guarded only by `adminMiddleware`. Conversely, `superAdminMiddleware` tests strictly for `'SUPER_ADMIN'`.
 - **Resolution**: While `adminMiddleware` is defined in Node, it is used by no route in the application (`grep` across all route files shows 0 usages of `adminMiddleware`). Thus, the earlier "ADMIN only" quirk has no runtime effect on any endpoint. Only `superAdminMiddleware` is actually attached to routes (`/api/users/**`), requiring `SUPER_ADMIN`.
 
+---
+
+## 2. Route Authentication Parity Audit
+
+The following table reflects a 100% comprehensive audit across all 18 route files in `IEX-Dashboard/backend/src/modules/` and root endpoints:
+
+| Route Group | Base URL Path | Node Auth Middleware | Java Spring Security Auth | Write Endpoints (POST/PUT/PATCH/DELETE) Open to Public in Node & Java | Parity Status |
+|---|---|---|---|---|---|
+| Authentication | `/api/auth` | Mixed: `/login`, `/send-otp`, `/verify-otp` (Public); `/me` (`authMiddleware`) | `POST /login`, `/send-otp`, `/verify-otp`: `permitAll()`; `GET /me`: `authenticated()` | `POST /api/auth/login`, `POST /api/auth/send-otp`, `POST /api/auth/verify-otp` | Exact Parity |
+| Uploads | `/api/uploads` | `authMiddleware` (all routes) | `.requestMatchers("/api/uploads/**").authenticated()` | None | Exact Parity |
+| Datasets | `/api/datasets` | `authMiddleware` (all routes) | `.requestMatchers("/api/datasets/**").authenticated()` | None | Exact Parity |
+| Upload History | `/api/upload-history` | `authMiddleware` (all routes) | `.requestMatchers("/api/upload-history/**").authenticated()` | None | Exact Parity |
+| Dashboard | `/api/dashboard` | None (Public) | `.requestMatchers("/api/dashboard/**").permitAll()` | None | Exact Parity |
+| Resource Center | `/api/resource-center` | None (Public) | `.requestMatchers("/api/resource-center/**").permitAll()` | `POST /:resourceType`, `POST /:resourceType/bulk`, `PUT /:resourceType/:id`, `DELETE /:resourceType/:id` | Exact Parity |
+| Scraper | `/api/scraper` | Mixed: `POST /sync` (`authMiddleware`); `POST /import` (Public, token header check) | `POST /sync`: `authenticated()`; `POST /import`: `permitAll()` | `POST /api/scraper/import` (secured via constant-time `x-webhook-token`) | Exact Parity |
+| Database | `/api/database` | None (Public) | `.requestMatchers("/api/database/**").permitAll()` | `POST /city-state`, `POST /holidays/upload` | Exact Parity |
+| API Logs | `/api/logs` | None (Public) | `.requestMatchers("/api/logs/**").permitAll()` | None | Exact Parity |
+| Market Operations | `/api/market-operations` | None (Public) | `.requestMatchers("/api/market-operations/**").permitAll()` | None | Exact Parity |
+| Savings Calculator | `/api/savings-calculator` | `authMiddleware` (all routes) | `.requestMatchers("/api/savings-calculator/**").authenticated()` | None | Exact Parity |
+| Savings Calculator New | `/api/savings-calculator-new` | `authMiddleware` (all routes) | `.requestMatchers("/api/savings-calculator-new/**").authenticated()` | None | Exact Parity |
+| Landing Price Calc | `/api/landing-price-calc` | `authMiddleware` (all routes) | `.requestMatchers("/api/landing-price-calc/**").authenticated()` | None | Exact Parity |
+| Forecast | `/api/forecast`, `/forecast` | None (Public) | `.requestMatchers("/api/forecast/**", "/forecast/**").permitAll()` | None | Exact Parity |
+| Users | `/api/users` | `authMiddleware` + `superAdminMiddleware` | `.requestMatchers("/api/users/**").hasRole("SUPER_ADMIN")` | None | Exact Parity |
+| Proposals | `/api/proposals` | None (Public) | `.requestMatchers("/api/proposals/**").permitAll()` | `POST /generate`, `POST /generate-technical`, `POST /generate-commercial` | Exact Parity |
+| Trader Performance | `/api/trader-performance` | None (Public) | `.requestMatchers("/api/trader-performance/**").permitAll()` | `POST /upload`, `POST /calculate`, `PUT /entries/:id`, `DELETE /entries/:id` | Exact Parity |
+| Trader Performance Daily | `/api/trader-performance-daily` | None (Public) | `.requestMatchers("/api/trader-performance-daily/**").permitAll()` | `POST /analysis`, `POST /upload` | Exact Parity |
+| UP Market | `/api/up-market` | None (Public) | `.requestMatchers("/api/up-market/**").permitAll()` | None | Exact Parity |
+| Health Probes | `/health`, `/health/database` | None (Public) | `.requestMatchers("/health", "/health/**").permitAll()` | None | Exact Parity |
+
+
 
 
 

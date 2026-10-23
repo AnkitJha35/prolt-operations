@@ -309,6 +309,23 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Startup fails if bypass is enabled in prod profile.
     - JWT initialization fails in prod if secret is under 32 bytes.
 
+### Hardening 3: Authentication parity
+- **Date**: 2026-10-23
+- **Actions**:
+  - `SecurityConfig`: Enforced exact parity with Node `authMiddleware`. Protected routes requiring JWT authentication: `/api/datasets/**`, `/api/upload-history/**`, `/api/landing-price-calc/**`, `/api/savings-calculator/**`, `/api/savings-calculator-new/**`, `/api/uploads/**`, `GET /api/auth/me`, `POST /api/scraper/sync`. Guarded `/api/users/**` requiring `SUPER_ADMIN`.
+  - Configured public routes matching Node: `POST /api/auth/login`, `/send-otp`, `/verify-otp`; `/api/dashboard/**`; `/api/resource-center/**`; `/api/database/**`; `/api/logs/**`; `/api/market-operations/**`; `/api/forecast/**` and `/forecast/**`; `/api/proposals/**`; `/api/trader-performance/**`; `/api/trader-performance-daily/**`; `/api/up-market/**`; `POST /api/scraper/import`; `/health` and `/health/database`.
+  - `ScraperController`: Updated `/api/scraper/import` webhook verification to use `MessageDigest.isEqual` for constant-time comparison, returning HTTP 401 `{"success":false,"message":"Unauthorized"}` matching Node `importScrapedData`.
+  - `HealthController`: Propagated database connectivity exceptions to `RestControllerAdvisor` to return standard 500 error matching Node `asyncHandler`.
+  - Documentation: Conducted 100% audit of all 18 route files in `IEX-Dashboard/backend/src/modules/` and recorded comprehensive route table in `docs/16-conversion-questions.md`.
+  - Tests: Created `AuthenticationParityIntegrationTest` verifying:
+    - Expired token on `/health` returns 200 OK.
+    - Expired token on protected `/api/datasets/summary` returns 401 Unauthorized `{"success":false,"message":"Unauthorized"}`.
+    - Public route group permits no token, bad token, client token, and superadmin token.
+    - Protected route group rejects no token and bad token with 401, permits client and superadmin with 200.
+    - SuperAdmin route group rejects no token (401), bad token (401), non-superadmin (403 `{"success":false,"message":"Forbidden: Super Admin access required"}`), and permits superadmin (200).
+    - Scraper `/sync` requires auth (401 without token) and `/import` enforces constant-time webhook secret (401 `{"success":false,"message":"Unauthorized"}`).
+
+
 
 
 

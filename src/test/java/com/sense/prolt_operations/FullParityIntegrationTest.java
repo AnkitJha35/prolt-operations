@@ -77,7 +77,8 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").exists());
 
-        mockMvc.perform(get("/actuator/prometheus"))
+        mockMvc.perform(get("/actuator/prometheus")
+                .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk());
     }
 

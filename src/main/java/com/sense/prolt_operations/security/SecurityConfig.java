@@ -56,24 +56,41 @@ public class SecurityConfig {
                 .accessDeniedHandler(accessDeniedHandler)
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/health", "/health/**", "/actuator/**", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                // Public health & docs
+                .requestMatchers("/health", "/health/**").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+
+                // Public auth endpoints
                 .requestMatchers("/api/auth/login", "/api/auth/send-otp", "/api/auth/verify-otp").permitAll()
+
+                // Public functional endpoints (exact parity with Node)
                 .requestMatchers("/api/dashboard/**").permitAll()
-                .requestMatchers("/api/datasets/**").permitAll()
-                .requestMatchers("/api/upload-history/**").permitAll()
-                .requestMatchers("/api/landing-price-calc/**").permitAll()
-                .requestMatchers("/api/proposals/**").permitAll()
-                .requestMatchers("/api/savings-calculator/**", "/api/savings-calculator-new/**").permitAll()
-                .requestMatchers("/api/trader-performance/**", "/api/trader-performance-daily/**").permitAll()
-                .requestMatchers("/api/up-market/**").permitAll()
-                .requestMatchers("/api/forecast/**", "/forecast/**").permitAll()
-                .requestMatchers("/api/scraper/**").permitAll()
+                .requestMatchers("/api/resource-center/**").permitAll()
                 .requestMatchers("/api/database/**").permitAll()
                 .requestMatchers("/api/logs/**").permitAll()
                 .requestMatchers("/api/market-operations/**").permitAll()
-                .requestMatchers("/api/resource-center/**").permitAll()
+                .requestMatchers("/api/forecast/**", "/forecast/**").permitAll()
+                .requestMatchers("/api/proposals/**").permitAll()
+                .requestMatchers("/api/trader-performance/**", "/api/trader-performance-daily/**").permitAll()
+                .requestMatchers("/api/up-market/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/scraper/import").permitAll()
+
+                // Protected scraper sync endpoint
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/scraper/sync").authenticated()
+
+                // Protected user management (Super Admin only)
                 .requestMatchers("/api/users/**").hasRole("SUPER_ADMIN")
+
+                // Protected business modules (exact parity with Node)
+                .requestMatchers("/api/datasets/**").authenticated()
+                .requestMatchers("/api/upload-history/**").authenticated()
+                .requestMatchers("/api/landing-price-calc/**").authenticated()
+                .requestMatchers("/api/savings-calculator/**", "/api/savings-calculator-new/**").authenticated()
                 .requestMatchers("/api/uploads/**").authenticated()
+                .requestMatchers("/api/auth/me").authenticated()
+
+                // Fallback
                 .anyRequest().authenticated()
             )
             .addFilterBefore(authRateLimiterFilter, UsernamePasswordAuthenticationFilter.class)

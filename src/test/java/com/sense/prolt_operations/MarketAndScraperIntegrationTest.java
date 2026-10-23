@@ -201,7 +201,7 @@ public class MarketAndScraperIntegrationTest extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Invalid webhook secret"));
+                .andExpect(jsonPath("$.message").value("Unauthorized"));
 
         // Invalid secret
         mockMvc.perform(post("/api/scraper/import")
@@ -210,7 +210,7 @@ public class MarketAndScraperIntegrationTest extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Invalid webhook secret"));
+                .andExpect(jsonPath("$.message").value("Unauthorized"));
     }
 
     @Test

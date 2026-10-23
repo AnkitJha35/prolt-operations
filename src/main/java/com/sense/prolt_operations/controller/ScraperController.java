@@ -130,9 +130,9 @@ public class ScraperController {
             @RequestBody(required = false) Map<String, Object> body) {
 
         String providedToken = webhookToken != null && !webhookToken.isBlank() ? webhookToken : webhookSecret;
-        if (providedToken == null || !providedToken.equals(appProperties.getWebhookSecret())) {
+        if (providedToken == null || !isSecretValid(providedToken, appProperties.getWebhookSecret())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("success", false, "message", "Invalid webhook secret"));
+                    .body(Map.of("success", false, "message", "Unauthorized"));
         }
 
         if (body == null || body.isEmpty()) {
@@ -298,5 +298,14 @@ public class ScraperController {
             return ResponseEntity.ok(Map.of("success", true, "count", successCount));
         }
         return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid payload"));
+    }
+
+    private boolean isSecretValid(String providedToken, String expectedSecret) {
+        if (providedToken == null || expectedSecret == null) {
+            return false;
+        }
+        return java.security.MessageDigest.isEqual(
+                providedToken.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                expectedSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }
