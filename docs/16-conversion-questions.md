@@ -102,6 +102,39 @@ The following table reflects a 100% comprehensive audit across all 18 route file
 | `X-Permitted-Cross-Domain-Policies` | `none` | Configured via `StaticHeadersWriter` | Exact Match |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Standard Spring Security HSTS on HTTPS requests | Exact Match |
 
+---
+
+## 5. Landing Price Service Error and Client Parity Contract
+
+### Upstream Behavior & Fallback Removal
+- **Node Implementation (`landing-price-calc.service.ts` & `landing-price-calc.controller.ts`)**:
+  - Node makes an HTTP `GET` request using `axios` to `https://www.iexindia.com/api/v1/calculator` with parameters `state` and `voltage`.
+  - Headers passed: `User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)` and `Accept: application/json`.
+  - Node **does NOT** implement any mock fallback or substitute numbers when the remote API fails.
+  - If upstream returns an error response, Node throws:
+    `new Error(\`IEX API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}\`)`
+  - If the request times out or network connection fails, Node throws:
+    `new Error('Failed to calculate landing price from IEX API')`
+  - The controller catches the error and returns:
+    `res.status(500).json({ message: error.message })` (Note: **no** `success: false` field is present in Node's response).
+
+### Spring Boot Parity
+- **Timeouts & Base URL**:
+  - Base URL configurable via `app.iex-calculator-api-url` (default: `https://www.iexindia.com`).
+  - Connect timeout: 5000 ms (`app.iex-calculator.connect-timeout`).
+  - Read timeout: 15000 ms (`app.iex-calculator.read-timeout`).
+  - Request factory: `SimpleClientHttpRequestFactory` configured with matching timeouts.
+- **Headers & Error Contract**:
+  - Request sends identical `User-Agent` and `Accept: application/json` headers.
+  - Removed all `fallbackCalculate` and mock data fallback logic.
+  - On upstream HTTP status error: maps to HTTP 500 `{"message": "IEX API Error: <status> - <responseBody>"}` without `success` field.
+  - On timeout/connectivity failure: maps to HTTP 500 `{"message": "Failed to calculate landing price from IEX API"}` without `success` field.
+- **WireMock Test Coverage**:
+  - Tested in `LandingPriceParityIntegrationTest`:
+    - Upstream 200: Successfully parses upstream JSON result.
+    - Upstream 500: Returns HTTP 500 `{"message": "IEX API Error: 500 - {\"error\":\"Internal Server Error\"}"}`.
+    - Upstream timeout: Returns HTTP 500 `{"message": "Failed to calculate landing price from IEX API"}`.
+
 
 
 

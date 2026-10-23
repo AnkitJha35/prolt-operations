@@ -373,6 +373,28 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Verified health and info are public, Prometheus requires authentication, and sensitive actuator endpoints return 401 unauthenticated and 404 authenticated.
     - Verified prod profile disables Swagger and hides health details.
 
+### Hardening 7: Landing price service error and client parity
+- **Date**: 2026-10-23
+- **Actions**:
+  - `LandingPriceService`: Removed `fallbackCalculate` and all mock/hardcoded fake calculation fallbacks. Node has zero fallback data and propagates errors directly.
+  - Configured timeouts and URL via `application.properties`:
+    - `app.iex-calculator-api-url=${IEX_CALCULATOR_API_URL:https://www.iexindia.com}`
+    - `app.iex-calculator.connect-timeout=5000`
+    - `app.iex-calculator.read-timeout=15000`
+  - RestTemplate configured via `SimpleClientHttpRequestFactory` with connect (5s) and read (15s) timeouts.
+  - Forwarded headers matching Node axios call: `User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)` and `Accept: application/json`.
+  - Upstream error mapping:
+    - HTTP error from upstream maps to `"IEX API Error: <status> - <responseBody>"`.
+    - Connection or read timeout maps to `"Failed to calculate landing price from IEX API"`.
+  - `LandingPriceCalcController`: Propagates upstream error as HTTP 500 `{"message": "<msg>"}` without `success` field matching Node controller.
+  - Added `org.wiremock:wiremock-standalone:3.12.0` in `pom.xml` test scope.
+  - Documented error and client contract in `docs/16-conversion-questions.md` Section 5.
+  - Tests: Created `LandingPriceParityIntegrationTest` verifying:
+    - Upstream 200: Successfully parses upstream calculator response.
+    - Upstream 500: Maps to HTTP 500 with exact error message and body shape.
+    - Upstream timeout: Enforces 500ms test timeout and returns exact timeout error message.
+
+
 
 
 

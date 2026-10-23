@@ -1,16 +1,19 @@
 package com.sense.prolt_operations.service;
 
-import com.sense.prolt_operations.config.AppProperties;
+import java.time.Duration;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.sense.prolt_operations.config.AppProperties;
 
 @Service
 public class LandingPriceService {
@@ -19,11 +22,20 @@ public class LandingPriceService {
     private final RestClient restClient;
     private final AppProperties appProperties;
 
-    public LandingPriceService(AppProperties appProperties) {
+    public LandingPriceService(
+            AppProperties appProperties,
+            @Value("${app.iex-calculator.connect-timeout:5000}") int connectTimeoutMs,
+            @Value("${app.iex-calculator.read-timeout:15000}") int readTimeoutMs) {
         this.appProperties = appProperties;
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs));
+        requestFactory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+
         this.restClient = RestClient.builder()
+            .requestFactory(requestFactory)
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-            .defaultHeader(HttpHeaders.USER_AGENT, "Mozilla/5.0")
+            .defaultHeader(HttpHeaders.USER_AGENT, "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
             .build();
     }
 
@@ -46,10 +58,14 @@ public class LandingPriceService {
                 })
                 .retrieve()
                 .body(Map.class);
-            return response != null ? response : fallbackCalculate(params);
+            return response;
+        } catch (HttpStatusCodeException e) {
+            String body = e.getResponseBodyAsString();
+            log.error("[LandingPriceService] IEX API error: status={}, body={}", e.getStatusCode().value(), body);
+            throw new RuntimeException("IEX API Error: " + e.getStatusCode().value() + " - " + body);
         } catch (Exception e) {
-            log.warn("[LandingPriceService] Direct call to {} failed: {}. Using fallback calculation.", endpoint, e.getMessage());
-            return fallbackCalculate(params);
+            log.error("[LandingPriceService] Failed to calculate landing price from IEX API: {}", e.getMessage());
+            throw new RuntimeException("Failed to calculate landing price from IEX API", e);
         }
     }
 
@@ -60,12 +76,10 @@ public class LandingPriceService {
                 .uri(endpoint, uriBuilder -> uriBuilder.queryParam("state", state).build())
                 .retrieve()
                 .body(Object.class);
+        } catch (HttpStatusCodeException e) {
+            throw new RuntimeException("IEX API Error: " + e.getStatusCode().value() + " - " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.warn("[LandingPriceService] getConsumerCategories failed: {}. Using fallback.", e.getMessage());
-            return List.of(
-                Map.of("id", "HV-1", "name", "Commercial"),
-                Map.of("id", "HV-2", "name", "Industrial")
-            );
+            throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "Failed to fetch consumer categories from IEX API", e);
         }
     }
 
@@ -79,13 +93,10 @@ public class LandingPriceService {
                     .build())
                 .retrieve()
                 .body(Object.class);
+        } catch (HttpStatusCodeException e) {
+            throw new RuntimeException("IEX API Error: " + e.getStatusCode().value() + " - " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.warn("[LandingPriceService] getVoltages failed: {}. Using fallback.", e.getMessage());
-            return List.of(
-                Map.of("id", "11kV", "name", "11 kV"),
-                Map.of("id", "33kV", "name", "33 kV"),
-                Map.of("id", "132kV", "name", "132 kV")
-            );
+            throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "Failed to fetch voltages from IEX API", e);
         }
     }
 
@@ -100,9 +111,10 @@ public class LandingPriceService {
                     .build())
                 .retrieve()
                 .body(Object.class);
+        } catch (HttpStatusCodeException e) {
+            throw new RuntimeException("IEX API Error: " + e.getStatusCode().value() + " - " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.warn("[LandingPriceService] getTodMonths failed: {}. Using fallback.", e.getMessage());
-            return List.of("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec");
+            throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "Failed to fetch TOD months from IEX API", e);
         }
     }
 
@@ -118,39 +130,10 @@ public class LandingPriceService {
                     .build())
                 .retrieve()
                 .body(Object.class);
+        } catch (HttpStatusCodeException e) {
+            throw new RuntimeException("IEX API Error: " + e.getStatusCode().value() + " - " + e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.warn("[LandingPriceService] getTodSlots failed: {}. Using fallback.", e.getMessage());
-            return List.of(
-                Map.of("slot", "Slot 1 (00:00 - 06:00)", "type", "Off-Peak"),
-                Map.of("slot", "Slot 2 (06:00 - 17:00)", "type", "Normal"),
-                Map.of("slot", "Slot 3 (17:00 - 24:00)", "type", "Peak")
-            );
+            throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "Failed to fetch TOD slots from IEX API", e);
         }
-    }
-
-    private Map<String, Object> fallbackCalculate(Map<String, String> params) {
-        double iexPrice = 4.50;
-        try {
-            if (params.containsKey("iexPrice")) {
-                iexPrice = Double.parseDouble(params.get("iexPrice"));
-            }
-        } catch (Exception ignored) {}
-
-        double landedCost = iexPrice + 1.85 + 0.52 + 0.15;
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("state", params.getOrDefault("state", "Uttar Pradesh"));
-        result.put("voltage", params.getOrDefault("voltage", "33kV"));
-        result.put("consumerCategory", params.getOrDefault("consumerCategory", "HV-2"));
-        result.put("iexPrice", iexPrice);
-        result.put("landedCost", Math.round(landedCost * 10000.0) / 10000.0);
-        result.put("breakdown", Map.of(
-            "transmissionLoss", 0.18,
-            "wheelingCharge", 0.45,
-            "crossSubsidySurcharge", 1.25,
-            "additionalSurcharge", 0.40,
-            "taxesAndDuties", 0.24
-        ));
-        return result;
     }
 }

@@ -1,10 +1,15 @@
 package com.sense.prolt_operations.controller;
 
-import com.sense.prolt_operations.service.LandingPriceService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.Map;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.sense.prolt_operations.service.LandingPriceService;
 
 @RestController
 @RequestMapping("/api/landing-price-calc")
@@ -18,19 +23,34 @@ public class LandingPriceCalcController {
 
     @GetMapping("/calculate")
     public ResponseEntity<?> calculate(@RequestParam Map<String, String> query) {
-        return ResponseEntity.ok(landingPriceService.calculate(query));
+        try {
+            return ResponseEntity.ok(landingPriceService.calculate(query));
+        } catch (Exception error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", error.getMessage() != null ? error.getMessage() : "Landing price calculation failed."));
+        }
     }
 
     @GetMapping("/consumer-category")
     public ResponseEntity<?> getConsumerCategories(@RequestParam(required = false, defaultValue = "") String state) {
-        return ResponseEntity.ok(landingPriceService.getConsumerCategories(state));
+        try {
+            return ResponseEntity.ok(landingPriceService.getConsumerCategories(state));
+        } catch (Exception error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", error.getMessage() != null ? error.getMessage() : "Failed to fetch consumer categories"));
+        }
     }
 
     @GetMapping("/voltage")
     public ResponseEntity<?> getVoltages(
             @RequestParam(required = false, defaultValue = "") String state,
             @RequestParam(required = false, defaultValue = "") String consumerCategory) {
-        return ResponseEntity.ok(landingPriceService.getVoltages(state, consumerCategory));
+        try {
+            return ResponseEntity.ok(landingPriceService.getVoltages(state, consumerCategory));
+        } catch (Exception error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", error.getMessage() != null ? error.getMessage() : "Failed to fetch voltages"));
+        }
     }
 
     @GetMapping("/tod-months")
@@ -38,7 +58,12 @@ public class LandingPriceCalcController {
             @RequestParam(required = false, defaultValue = "") String state,
             @RequestParam(required = false, defaultValue = "") String consumerCategory,
             @RequestParam(required = false, defaultValue = "") String voltage) {
-        return ResponseEntity.ok(landingPriceService.getTodMonths(state, consumerCategory, voltage));
+        try {
+            return ResponseEntity.ok(landingPriceService.getTodMonths(state, consumerCategory, voltage));
+        } catch (Exception error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", error.getMessage() != null ? error.getMessage() : "Failed to fetch TOD months"));
+        }
     }
 
     @GetMapping("/tod-slots")
@@ -47,6 +72,11 @@ public class LandingPriceCalcController {
             @RequestParam(required = false, defaultValue = "") String consumerCategory,
             @RequestParam(required = false, defaultValue = "") String voltage,
             @RequestParam(required = false, defaultValue = "") String month) {
-        return ResponseEntity.ok(landingPriceService.getTodSlots(state, consumerCategory, voltage, month));
+        try {
+            return ResponseEntity.ok(landingPriceService.getTodSlots(state, consumerCategory, voltage, month));
+        } catch (Exception error) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", error.getMessage() != null ? error.getMessage() : "Failed to fetch TOD slots"));
+        }
     }
 }

@@ -6,6 +6,8 @@ import com.sense.prolt_operations.entity.Role;
 import com.sense.prolt_operations.entity.User;
 import com.sense.prolt_operations.repository.UserRepository;
 import com.sense.prolt_operations.security.JwtService;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,9 @@ class CalculationAndTariffIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private com.sense.prolt_operations.service.LandingPriceService landingPriceService;
 
     private String adminToken;
 
@@ -265,6 +270,12 @@ class CalculationAndTariffIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Landing Price Calculator Proxy Endpoints")
     void testLandingPriceCalcEndpoints() throws Exception {
+        org.mockito.Mockito.when(landingPriceService.getConsumerCategories("UP")).thenReturn(List.of(Map.of("id", "HV-1")));
+        org.mockito.Mockito.when(landingPriceService.getVoltages("UP", "HV-2")).thenReturn(List.of(Map.of("id", "33kV")));
+        org.mockito.Mockito.when(landingPriceService.getTodMonths("UP", "HV-2", "33kV")).thenReturn(List.of("Jan"));
+        org.mockito.Mockito.when(landingPriceService.getTodSlots("UP", "HV-2", "33kV", "Jan")).thenReturn(List.of(Map.of("slot", "Slot 1")));
+        org.mockito.Mockito.when(landingPriceService.calculate(org.mockito.ArgumentMatchers.any())).thenReturn(Map.of("landedCost", 6.85));
+
         mockMvc.perform(get("/api/landing-price-calc/consumer-category?state=UP")
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isOk());
