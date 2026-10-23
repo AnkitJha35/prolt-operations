@@ -19,7 +19,6 @@
 		<poi.version>5.4.0</poi.version>
 		<pdfbox.version>3.0.3</pdfbox.version>
 		<playwright.version>1.49.0</playwright.version>
-		<jsoup.version>1.18.3</jsoup.version>
 		<commons-csv.version>1.12.0</commons-csv.version>
 		<shedlock.version>5.16.0</shedlock.version>
 		<jfreechart.version>1.5.5</jfreechart.version>
@@ -112,11 +111,6 @@
 		</dependency>
 
 		<!-- Scrapers & Parsers -->
-		<dependency>
-			<groupId>org.jsoup</groupId>
-			<artifactId>jsoup</artifactId>
-			<version>${jsoup.version}</version>
-		</dependency>
 		<dependency>
 			<groupId>com.microsoft.playwright</groupId>
 			<artifactId>playwright</artifactId>

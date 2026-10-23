@@ -1,21 +1,51 @@
 package com.sense.prolt_operations;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sense.prolt_operations.entity.Role;
+import com.sense.prolt_operations.entity.User;
+import com.sense.prolt_operations.repository.UserRepository;
 import com.sense.prolt_operations.scheduler.AppScheduler;
+import com.sense.prolt_operations.security.JwtService;
 import com.sense.prolt_operations.service.ScraperService;
 import com.sense.prolt_operations.service.StarrocksService;
 
+@AutoConfigureMockMvc
 public class ScraperAndSchedulerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JwtService jwtService;
+
+    @MockBean
     private ScraperService scraperService;
 
     @Autowired
@@ -24,43 +54,68 @@ public class ScraperAndSchedulerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private AppScheduler appScheduler;
 
-    @Test
-    @DisplayName("ScraperService: parses saved HTML fixture without live network calls")
-    void testScraperHtmlFixtureParsing() {
-        scraperService.setFixturePath("classpath:fixtures/dam_sample.html");
-        try {
-            List<Map<String, Object>> records = scraperService.scrapeDam();
-            assertThat(records).isNotEmpty();
-            assertThat(records.size()).isEqualTo(4);
+    private String validJwtToken;
 
-            Map<String, Object> first = records.get(0);
-            assertThat(first.get("intervalNumber")).isEqualTo(1);
-            assertThat(first.get("intervalTime")).isEqualTo("00:00 - 00:15");
-            assertThat(first.get("mcp")).isEqualTo(3450.25);
-            assertThat(first.get("mcv")).isEqualTo(4210.50);
-            assertThat(first.get("purchaseBid")).isEqualTo(5120.00);
-            assertThat(first.get("sellBid")).isEqualTo(4900.00);
-        } finally {
-            scraperService.setFixturePath(null);
+    @BeforeEach
+    void setUp() {
+        User user = userRepository.findByUsername("admin")
+                .orElseGet(() -> {
+                    User u = User.create();
+                    u.setUsername("admin");
+                    u.setEmail("admin@probus.io");
+                    u.setPasswordHash("$2a$10$Rv4pjBCD9Lh7c4x1QTgxtO8uCxvpzt5tuDhdOn5VtLGAkJAKvl/cm");
+                    u.setRole(Role.ADMIN);
+                    return userRepository.save(u);
+                });
+        validJwtToken = jwtService.generateToken(user);
+    }
+
+    private List<Map<String, Object>> create96SampleRecords(String date) {
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (int i = 1; i <= 96; i++) {
+            int hh = (i - 1) / 4;
+            int mm = ((i - 1) % 4) * 15;
+            String time = String.format("%02d:%02d", hh, mm);
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("intervalNumber", i);
+            r.put("intervalTime", time);
+            r.put("purchaseBid", 5000.0 + i);
+            r.put("sellBid", 4800.0 + i);
+            r.put("mcv", 4500.0 + i);
+            r.put("fsv", 4500.0 + i);
+            r.put("mcp", 3500.0 + i);
+            r.put("date", date);
+            records.add(r);
         }
+        return records;
     }
 
     @Test
-    @DisplayName("ScraperService: fallback 96-block generator works for all markets")
-    void testScraperFallbackGeneration() {
-        scraperService.setFixturePath(null);
+    @DisplayName("POST /api/scraper/sync DAM: mocks ScraperService and persists 96 records")
+    void testScraperSyncDamSuccess() throws Exception {
+        String today = LocalDate.now().toString();
+        when(scraperService.scrapeDam()).thenReturn(create96SampleRecords(today));
 
-        List<Map<String, Object>> dam = scraperService.scrapeDam();
-        assertThat(dam).hasSize(96);
+        mockMvc.perform(post("/api/scraper/sync")
+                        .header("Authorization", "Bearer " + validJwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("market", "DAM"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Successfully scraped and saved 96 records for DAM"))
+                .andExpect(jsonPath("$.datasetId").isNotEmpty());
+    }
 
-        List<Map<String, Object>> gdam = scraperService.scrapeGdam();
-        assertThat(gdam).hasSize(96);
-
-        List<Map<String, Object>> rtm = scraperService.scrapeRtm();
-        assertThat(rtm).hasSize(96);
-
-        List<Map<String, Object>> rec = scraperService.scrapeRec();
-        assertThat(rec).hasSize(96);
+    @Test
+    @DisplayName("POST /api/scraper/sync REC: returns 500 with 'REC persistence not yet ported'")
+    void testScraperSyncRecReturns500() throws Exception {
+        mockMvc.perform(post("/api/scraper/sync")
+                        .header("Authorization", "Bearer " + validJwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("market", "REC"))))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("REC persistence not yet ported"));
     }
 
     @Test

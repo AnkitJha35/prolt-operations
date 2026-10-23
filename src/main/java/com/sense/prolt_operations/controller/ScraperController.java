@@ -73,6 +73,11 @@ public class ScraperController {
             throw new BadRequestException("Invalid market specified. Must be DAM, GDAM, RTM, or REC.");
         }
 
+        if ("REC".equals(market)) {
+            apiLogService.createLog("IEX REC Scraper", "manual-trigger", "ERROR", "REC persistence not yet ported");
+            throw new AppBaseException("REC persistence not yet ported", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
         log.info("Manual scraper triggered for market: {}", market);
         List<Map<String, Object>> records;
         try {

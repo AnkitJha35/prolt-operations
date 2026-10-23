@@ -434,8 +434,18 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Sanitized hardcoded secrets and default values from `AppProperties.java`, `AppRunner.java`, `AuthenticationParityIntegrationTest.java`, and `BaseIntegrationTest.java`.
   - Added unit and context runner tests (`SEC-08` through `SEC-11`) in `ProfileSecurityDefaultsTest.java` verifying that production fails when datasource properties are missing and that StarRocks safely handles blank hosts.
 
-
-
-
-
-
+### Ingestion 2: Scraper parity and row parsers
+- **Date**: 2026-10-23
+- **Actions**:
+  - Re-architected `ScraperService` to match Node `scraper.service.ts` parity:
+    - Pure row-parsing functions (`parseDamRows`, `parseGdamRows`, `parseRtmRows`, `parseRecRows`) operating on static `List<List<String>>` table matrices without requiring browser or HTML dependencies.
+    - Playwright Chromium launch options aligned with Node Puppeteer args: headless, `--no-sandbox`, `--disable-setuid-sandbox`, `--disable-dev-shm-usage`, timezone `Asia/Kolkata`, default navigation/action timeout of 60,000 ms.
+    - Table-selector timeouts: 15,000 ms for DAM, GDAM, and REC; 30,000 ms for RTM.
+    - Executable path only applied when `app.puppeteer-executable-path` is configured and non-blank.
+    - RTM retry loop: 3 attempts with a 5,000 ms delay on failure or empty results.
+    - Deleted `generateSyntheticBlocks`, offline fixture loading, `parseHtmlTable`, and removed `jsoup` dependency from `pom.xml`.
+  - Added REC persistence fail-closed guard in `ScraperController` (`POST /api/scraper/sync`) returning HTTP 500 (`"REC persistence not yet ported"`) and documented in `docs/16-conversion-questions.md`.
+  - Replaced fixture-based test in `ScraperAndSchedulerIntegrationTest` with Mockito-mocked `ScraperService` testing both successful DAM sync and the REC 500 error contract.
+  - Deleted stale test fixture `src/test/resources/fixtures/dam_sample.html`.
+  - Created pure unit tests in `ScraperRowParserTest.java` verifying row parsing, column index mappings, empty row skipping, and multi-format variants.
+  - Added `ScraperLiveManualTest.java` annotated with `@Tag("live")` and `@Disabled` for on-demand live testing against IEX website.

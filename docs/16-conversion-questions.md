@@ -228,5 +228,13 @@ As part of the secrets and defaults hardening (Ingestion 1), all default values 
 
 Local development defaults have been moved into `src/main/resources/application-dev.properties` so `mvn spring-boot:run -Dspring-boot.run.profiles=dev` functions out of the box against local development infrastructure. Production enforces non-blank datasource properties via `ProductionDatasourceValidator`. Note: In accordance with zero-credential exposure security guidelines, raw secret strings have been sanitized and are not retained in git or docs.
 
+---
 
+## 9. REC Market Persistence Status
 
+- **Node Reference**: `backend/src/modules/persistence/persistence.service.ts` (lines 207–221).
+  - Node persists REC monthly records into `prisma.recRecord` (`year`, `month`, `type`, `buyBids`, `sellBids`, `clearedVolume`, `clearedPrice`, `noOfParticipants`).
+- **Java Status**:
+  - `RecRecord` entity and `RecRecordRepository` exist in the codebase, but `PersistenceService.insertMarketRecords` does not yet contain the monthly batch persistence logic for `MarketType.REC`.
+- **Parity Decision**:
+  - In `ScraperController.triggerScraper` (`POST /api/scraper/sync`), if `market=REC` is requested, the endpoint immediately returns HTTP 500 with `{"success": false, "message": "REC persistence not yet ported"}` and logs the event to `apiLogService`. This prevents unpersisted scraping attempts from succeeding silently or dropping data.
