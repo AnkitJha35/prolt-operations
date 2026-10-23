@@ -135,6 +135,40 @@ The following table reflects a 100% comprehensive audit across all 18 route file
     - Upstream 500: Returns HTTP 500 `{"message": "IEX API Error: 500 - {\"error\":\"Internal Server Error\"}"}`.
     - Upstream timeout: Returns HTTP 500 `{"message": "Failed to calculate landing price from IEX API"}`.
 
+---
+
+## 6. Trader Performance User Auditing Parity (createdBy & updatedBy)
+
+### Node Audit (`trader-performance.controller.ts` & `trader-performance.service.ts`)
+- **Controller behavior**:
+  - `create`: Calls `TraderPerformanceService.create({ ...req.body, createdBy: req.user?.username })`.
+    - If unauthenticated, `req.user` is `undefined`, so `createdBy` is `undefined`. It does NOT pass `updatedBy` (also `undefined`).
+    - If authenticated, `createdBy` is set to `req.user.username` (e.g. `"traderUser"`).
+  - `update`: Calls `TraderPerformanceService.update(req.params.id, { ...req.body, updatedBy: req.user?.username })`.
+    - If unauthenticated, `updatedBy` is `undefined`.
+    - If authenticated, `updatedBy` is set to `req.user.username`.
+- **Database persistence (Prisma)**:
+  - In Prisma, passing `undefined` for a nullable column (`createdBy`, `updatedBy` in `savings_calculator_new_entries` / `trader_performance_entries`) leaves the field as `NULL` in PostgreSQL.
+  - Node has **no** default fallback string (such as `"system"`). It leaves unauthenticated entries as `NULL`.
+- **History records**:
+  - Node's `tx.traderPerformanceEntryHistory.create` explicitly persists `createdBy: entry.createdBy` and `updatedBy: entry.updatedBy`.
+
+### Spring Boot Parity
+- **Controller (`TraderPerformanceController.java`)**:
+  - Replaced hardcoded `"system"` fallback with safe null check on `@AuthenticationPrincipal ProltUserPrincipal principal`:
+    `String username = (principal != null) ? principal.getUsername() : null;`
+  - Prevents NPE when unauthenticated and assigns `null` matching Node's `undefined -> NULL` semantics.
+- **Service (`TraderPerformanceService.java`)**:
+  - In `create`: sets `entry.setCreatedBy(username)` and `entry.setUpdatedBy(null)`.
+  - In `update`: sets `entry.setUpdatedBy(username)`, preserving existing `createdBy`.
+  - In `copyToHistory`: copies `target.setCreatedBy(source.getCreatedBy())` and `target.setUpdatedBy(source.getUpdatedBy())`.
+- **Test Coverage (`TraderPerformanceAuditingIntegrationTest.java`)**:
+  - `create_withoutToken_savesNullCreatedByAndUpdatedBy`: Verifies unauthenticated create saves `null` for both `createdBy` and `updatedBy` in both entity and history table.
+  - `create_withToken_savesUsernameAsCreatedByAndNullUpdatedBy`: Verifies authenticated create sets `createdBy = "traderUser"` and `updatedBy = null`.
+  - `update_withoutToken_setsUpdatedByToNull`: Verifies unauthenticated update leaves `updatedBy = null` while preserving original `createdBy`.
+  - `update_withToken_setsUpdatedByToUpdaterUsername`: Verifies authenticated update updates `updatedBy = "updaterUser"` while preserving `createdBy`.
+
+
 
 
 

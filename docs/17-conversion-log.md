@@ -394,6 +394,24 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Upstream 500: Maps to HTTP 500 with exact error message and body shape.
     - Upstream timeout: Enforces 500ms test timeout and returns exact timeout error message.
 
+### Hardening 8: Trader performance user auditing
+- **Date**: 2026-10-23
+- **Actions**:
+  - `TraderPerformanceController`:
+    - Inspected Node authority: on create, Node calls `TraderPerformanceService.create({ ...req.body, createdBy: req.user?.username })` without passing `updatedBy`. When unauthenticated, `req.user` is undefined, setting `createdBy` and `updatedBy` to `undefined` (stored as `NULL` in PostgreSQL).
+    - Removed hardcoded `"system"` fallback. Replaced with safe null check: `String username = (principal != null) ? principal.getUsername() : null;` across `create` and `update` endpoints.
+  - `TraderPerformanceService`:
+    - Updated `create`: assigns `entry.setCreatedBy(username)` and `entry.setUpdatedBy(null)`.
+    - Updated `update`: assigns `entry.setUpdatedBy(username)`, leaving `createdBy` unchanged.
+    - Updated `copyToHistory`: copies `target.setCreatedBy(source.getCreatedBy())` and `target.setUpdatedBy(source.getUpdatedBy())` matching Node's history persistence.
+  - Documented auditing contract and comparison in `docs/16-conversion-questions.md` Section 6.
+  - Tests: Created `TraderPerformanceAuditingIntegrationTest` verifying:
+    - Unauthenticated create sets `createdBy = null` and `updatedBy = null` on entity and history record.
+    - Authenticated create sets `createdBy = "traderUser"` and `updatedBy = null` on entity and history record.
+    - Unauthenticated update sets `updatedBy = null` while preserving original `createdBy`.
+    - Authenticated update sets `updatedBy = "updaterUser"` while preserving original `createdBy`.
+
+
 
 
 

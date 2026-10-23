@@ -183,7 +183,7 @@ public class TraderPerformanceService {
         entry.setCurrentLpsc(dto.currentLpsc());
         entry.setBillDate(dto.billDate());
         entry.setCreatedBy(username);
-        entry.setUpdatedBy(username);
+        entry.setUpdatedBy(null);
         entry.setCreatedAt(LocalDateTime.now());
         entry.setUpdatedAt(LocalDateTime.now());
 
@@ -415,6 +415,8 @@ public class TraderPerformanceService {
         target.setArrearAmount(source.getArrearAmount());
         target.setCurrentLpsc(source.getCurrentLpsc());
         target.setBillDate(source.getBillDate());
+        target.setCreatedBy(source.getCreatedBy());
+        target.setUpdatedBy(source.getUpdatedBy());
         target.setChangedAt(LocalDateTime.now());
     }
 

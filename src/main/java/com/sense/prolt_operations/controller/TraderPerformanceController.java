@@ -60,7 +60,7 @@ public class TraderPerformanceController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Missing required fields: clientName, industryName, address."));
         }
-        String username = principal != null ? principal.getUsername() : "system";
+        String username = (principal != null) ? principal.getUsername() : null;
         SavingsEntryDTO entry = traderPerformanceService.create(dto, username);
         return ResponseEntity.status(HttpStatus.CREATED).body(entry);
     }
@@ -93,7 +93,7 @@ public class TraderPerformanceController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Missing required fields: clientName, industryName, address."));
         }
-        String username = principal != null ? principal.getUsername() : "system";
+        String username = (principal != null) ? principal.getUsername() : null;
         SavingsEntryDTO entry = traderPerformanceService.update(id, dto, username);
         return ResponseEntity.ok(entry);
     }
