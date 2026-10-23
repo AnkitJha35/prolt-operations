@@ -124,9 +124,9 @@ class ProposalAndDocumentIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("PROP-03: Dual mount /api/proposal/generate endpoint")
-    void testDualMountProposalGenerate() throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/proposal/generate")
+    @DisplayName("PROP-03: Generate generic proposal endpoint /api/proposals/generate")
+    void testProposalGenerate() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/proposals/generate")
                 .header("Authorization", "Bearer " + validToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"client_name\": \"Jindal Power\"}"))

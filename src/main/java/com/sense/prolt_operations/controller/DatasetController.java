@@ -17,7 +17,7 @@ import com.sense.prolt_operations.service.DatasetService;
 import com.sense.prolt_operations.service.PersistenceService;
 
 @RestController
-@RequestMapping(value = {"/api/datasets", "/api/dataset"})
+@RequestMapping("/api/datasets")
 public class DatasetController {
 
     private static final Logger log = LoggerFactory.getLogger(DatasetController.class);

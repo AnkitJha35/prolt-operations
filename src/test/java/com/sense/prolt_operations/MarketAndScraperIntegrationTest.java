@@ -115,7 +115,7 @@ public class MarketAndScraperIntegrationTest extends BaseIntegrationTest {
     @Order(1)
     @DisplayName("DATA-01a: Timeseries with invalid market returns 400 Bad Request")
     void testTimeseriesInvalidMarket() throws Exception {
-        mockMvc.perform(get("/api/dataset/timeseries")
+        mockMvc.perform(get("/api/datasets/timeseries")
                         .header("Authorization", "Bearer " + validJwtToken)
                         .param("date", "2026-06-20")
                         .param("market", "XYZ"))
@@ -128,7 +128,7 @@ public class MarketAndScraperIntegrationTest extends BaseIntegrationTest {
     @Order(2)
     @DisplayName("DATA-01b: Timeseries with no records for date returns 200 with empty list and count 0")
     void testTimeseriesNoRecordsFound() throws Exception {
-        mockMvc.perform(get("/api/dataset/timeseries")
+        mockMvc.perform(get("/api/datasets/timeseries")
                         .header("Authorization", "Bearer " + validJwtToken)
                         .param("date", "2026-06-20")
                         .param("market", "DAM"))
@@ -165,8 +165,8 @@ public class MarketAndScraperIntegrationTest extends BaseIntegrationTest {
         Dataset dataset = persistenceService.persistDataset(dto);
         assertThat(dataset).isNotNull();
 
-        // Test primary endpoint: /api/dataset/timeseries
-        mockMvc.perform(get("/api/dataset/timeseries")
+        // Test endpoint: /api/datasets/timeseries
+        mockMvc.perform(get("/api/datasets/timeseries")
                         .header("Authorization", "Bearer " + validJwtToken)
                         .param("date", "2026-06-20")
                         .param("market", "DAM"))
@@ -179,15 +179,6 @@ public class MarketAndScraperIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data[0].mcv").value(4210.50))
                 .andExpect(jsonPath("$.data[0].purchaseBid").value(5120.00))
                 .andExpect(jsonPath("$.data[0].sellBid").value(4900.00));
-
-        // Test plural alias endpoint: /api/datasets/timeseries
-        mockMvc.perform(get("/api/datasets/timeseries")
-                        .header("Authorization", "Bearer " + validJwtToken)
-                        .param("date", "2026-06-20")
-                        .param("market", "DAM"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.count").value(96));
     }
 
     // ==========================================

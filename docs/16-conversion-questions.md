@@ -11,6 +11,7 @@ This document records any ambiguities, discrepancies, edge cases, or known Node.
 | 5 | In-Memory OTP Store vs Redis | `backend/src/modules/auth/otp.service.ts` vs Doc 06 | Node stored OTP in a local Map; Doc 06 requested Redis. | In-memory fallback allowed only in `dev` and `test` profiles (`app.auth.otp.allow-memory-fallback=true`). In `prod` (`allow-memory-fallback=false`), if Redis is unavailable, logs ERROR and fails request with 500. |
 | 6 | `/api/auth/me` Response Property | `backend/src/modules/auth/auth.controller.ts:L51` vs Doc 02 | Node code returns `{ success: true, user }` while Doc 02 / Swagger states `{ success: true, data }`. | Provided both `user` and `data` fields in response payload, ensuring full backwards compatibility with all clients. |
 | 7 | Dual Route Aliases for OTP | `backend/src/modules/auth/auth.routes.ts` vs Doc 12 | Node defined `/send-otp` and `/verify-otp`, while Doc 12 scenario AUTH-02/03 referenced `/otp/generate` and `/otp/verify`. | Decision applied: Removed `/otp/generate` and `/otp/verify`. Kept only canonical `/send-otp` and `/verify-otp`. Corrected 12-test-baseline.md scenarios. |
+| 8 | Singular Route Paths (`/api/proposal`, `/api/dataset`, `/api/api-log`) | `backend/src/app.ts` vs Docs 02/12/14/15 & Swagger | Singular paths appear in IEX-Dashboard docs 02/12/14/15 and Swagger comments, but Node never served them (Node only mounts plural `/api/proposals`, `/api/datasets`, and `/api/logs`). | Removed invented singular routes from controllers, security config, and tests to match Node authority exactly. Kept real double mount `/api/forecast` and `/forecast`. |
 
 ## Known Node Quirks
 
@@ -25,7 +26,8 @@ This document records any ambiguities, discrepancies, edge cases, or known Node.
   };
   ```
 - **Quirk Description**: Standard hierarchical RBAC usually implies `SUPER_ADMIN` possesses a superset of `ADMIN` capabilities. However, in the Node.js implementation, `adminMiddleware` tests strictly for exact string equality with `'ADMIN'`, therefore returning `403 Forbidden` if a user with role `SUPER_ADMIN` attempts to access routes guarded only by `adminMiddleware`. Conversely, `superAdminMiddleware` tests strictly for `'SUPER_ADMIN'`.
-- **Resolution**: Ported faithfully without modifying role hierarchy. Endpoints guarded by `adminMiddleware` only allow `Role.ADMIN`, and endpoints guarded by `superAdminMiddleware` only allow `Role.SUPER_ADMIN`, preserving 1:1 behavioral parity with the Node application.
+- **Resolution**: While `adminMiddleware` is defined in Node, it is used by no route in the application (`grep` across all route files shows 0 usages of `adminMiddleware`). Thus, the earlier "ADMIN only" quirk has no runtime effect on any endpoint. Only `superAdminMiddleware` is actually attached to routes (`/api/users/**`), requiring `SUPER_ADMIN`.
+
 
 
 

@@ -150,22 +150,6 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.message").value("OTP sent successfully"));
     }
 
-    @Test
-    @Order(5)
-    @DisplayName("AUTH-02: Removed alias /api/auth/otp/generate returns 401/404")
-    void testAuth02_OtpGenerateAlias_Removed() throws Exception {
-        String payload = """
-            {
-                "email": "admin@iexdashboard.local"
-            }
-            """;
-
-        // /otp/generate was removed; without auth it returns 401 Unauthorized
-        mockMvc.perform(post("/api/auth/otp/generate")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
-                .andExpect(status().isUnauthorized());
-    }
 
     @Test
     @Order(6)

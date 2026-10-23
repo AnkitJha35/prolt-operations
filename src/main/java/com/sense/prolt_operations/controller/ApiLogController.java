@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping({"/api/logs", "/api/api-log"})
+@RequestMapping("/api/logs")
 @Tag(name = "API Logs", description = "System and integration API telemetry logs")
 public class ApiLogController {
 

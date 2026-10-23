@@ -50,9 +50,7 @@ public class AuthRateLimiterFilter extends OncePerRequestFilter {
         if (uri == null) return false;
         return uri.equals("/api/auth/login") ||
                uri.equals("/api/auth/send-otp") ||
-               uri.equals("/api/auth/verify-otp") ||
-               uri.equals("/api/auth/otp/generate") ||
-               uri.equals("/api/auth/otp/verify");
+               uri.equals("/api/auth/verify-otp");
     }
 
     private String resolveClientIp(HttpServletRequest request) {

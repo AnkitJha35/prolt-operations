@@ -280,5 +280,20 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Created `FullParityIntegrationTest` verifying all 7 subsystems, health checks, Prometheus metrics, and security guards.
     - Entire project test suite executed: **51 tests across 8 test suites passed with ZERO failures (100% success rate)**.
 
+---
+
+## 3. Hardening Log
+
+### Hardening 1: Remove invented routes and stale code
+- **Date**: 2026-10-23
+- **Actions**:
+  - Removed invented singular routes (`/api/proposal`, `/api/dataset`, `/api/api-log`) from `ProposalController`, `DatasetController`, `ApiLogController`, and `SecurityConfig`.
+  - Preserved authentic dual mount `/api/forecast` and `/forecast`.
+  - Removed stale `/api/auth/otp/generate` and `/api/auth/otp/verify` path matchers from `AuthRateLimiterFilter`.
+  - Updated integration tests in `ProposalAndDocumentIntegrationTest` (`/api/proposals/generate`), `MarketAndScraperIntegrationTest` (`/api/datasets/timeseries`), and removed obsolete OTP alias test in `AuthAndUserIntegrationTest`.
+  - Disabled `MailHealthIndicator` in `BaseIntegrationTest` to avoid false 503 during offline integration testing.
+  - Documented findings in `docs/16-conversion-questions.md` (Item 8).
+
+
 
 

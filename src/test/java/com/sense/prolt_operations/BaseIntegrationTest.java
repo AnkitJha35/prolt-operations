@@ -35,6 +35,7 @@ public abstract class BaseIntegrationTest {
         registry.add("app.auth.otp.allow-memory-fallback", () -> "true");
         registry.add("app.run-scraper", () -> "false");
         registry.add("management.health.redis.enabled", () -> "false");
+        registry.add("management.health.mail.enabled", () -> "false");
         registry.add("management.endpoints.web.exposure.include", () -> "*");
         registry.add("management.prometheus.metrics.export.enabled", () -> "true");
     }
