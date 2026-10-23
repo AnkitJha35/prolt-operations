@@ -10,6 +10,7 @@ import javax.crypto.SecretKey;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -28,32 +29,35 @@ public class JwtService {
 
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
 
-    @Value("${app.jwt.secret:super_secret_jwt_key_for_development}")
+    @Value("${app.jwt.secret:}")
     private String secret;
 
     @Value("${app.jwt.expires-in:7d}")
     private String expiresIn;
+
+    @Autowired(required = false)
+    private org.springframework.core.env.Environment environment;
 
     private SecretKey signingKey;
     private long expirationMillis;
 
     @PostConstruct
     public void init() {
-        this.signingKey = buildKey(secret);
-        this.expirationMillis = parseExpiration(expiresIn);
-    }
+        boolean isProd = environment != null && java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod");
+        byte[] bytes = (secret != null) ? secret.getBytes(StandardCharsets.UTF_8) : new byte[0];
 
-    private SecretKey buildKey(String secretStr) {
-        byte[] bytes = secretStr != null ? secretStr.getBytes(StandardCharsets.UTF_8) : new byte[32];
-        if (bytes.length < 32) {
-            try {
-                MessageDigest md = MessageDigest.getInstance("SHA-256");
-                bytes = md.digest(bytes);
-            } catch (NoSuchAlgorithmException e) {
-                throw new RuntimeException("SHA-256 not available", e);
+        if (isProd) {
+            if (bytes.length < 32) {
+                throw new IllegalStateException("FATAL: In production, app.jwt.secret must be provided and must be at least 32 bytes long!");
             }
         }
-        return Keys.hmacShaKeyFor(bytes);
+
+        if (bytes.length < 32) {
+            throw new IllegalStateException("FATAL: app.jwt.secret must be at least 32 bytes long (got " + bytes.length + " bytes). Please configure a secure secret in your profile.");
+        }
+
+        this.signingKey = Keys.hmacShaKeyFor(bytes);
+        this.expirationMillis = parseExpiration(expiresIn);
     }
 
     private long parseExpiration(String exp) {

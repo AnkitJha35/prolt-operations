@@ -36,6 +36,7 @@ public abstract class BaseIntegrationTest {
         registry.add("app.run-scraper", () -> "false");
         registry.add("management.health.redis.enabled", () -> "false");
         registry.add("management.health.mail.enabled", () -> "false");
+        registry.add("app.jwt.secret", () -> "super_secret_jwt_key_for_testing_purposes_at_least_32_bytes!");
         registry.add("management.endpoints.web.exposure.include", () -> "*");
         registry.add("management.prometheus.metrics.export.enabled", () -> "true");
     }

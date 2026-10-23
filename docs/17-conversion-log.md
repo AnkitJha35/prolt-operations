@@ -294,6 +294,22 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Disabled `MailHealthIndicator` in `BaseIntegrationTest` to avoid false 503 during offline integration testing.
   - Documented findings in `docs/16-conversion-questions.md` (Item 8).
 
+### Hardening 2: Fail-closed security defaults
+- **Date**: 2026-10-23
+- **Actions**:
+  - `application.properties`: Configured fail-closed defaults: `app.auth.superadmin-otp-bypass.enabled=${SUPERADMIN_OTP_BYPASS_ENABLED:false}`, `app.auth.superadmin-otp-bypass.otp-value=${SUPERADMIN_OTP:}`, `app.auth.otp.allow-memory-fallback=${OTP_ALLOW_MEMORY_FALLBACK:false}`, `app.jwt.secret=${JWT_SECRET:}` (no default fallback values).
+  - `application-dev.properties`: Explicitly enabled dev bypass (`true`), configured dev OTP `749261`, enabled memory fallback (`true`), and documented 32-byte dev JWT secret.
+  - `application-prod.properties`: Explicitly disabled bypass and memory fallback.
+  - `OtpService`: Removed hardcoded `749261` and `"true"` defaults from `@Value` annotations. Added `@PostConstruct` startup validation that fails startup if bypass is enabled without a configured OTP value, or if bypass is enabled while the `prod` profile is active.
+  - `JwtService`: Removed default secret and silent SHA-256 padding. Added `@PostConstruct` startup validation requiring at least 32 bytes for HMAC-SHA256 in all environments, and refusing startup if missing or short in production.
+  - Tests: Created `ProfileSecurityDefaultsTest` verifying:
+    - Without active profile, superadmin bypass is rejected (fails closed).
+    - With dev profile, superadmin bypass succeeds.
+    - Startup fails if bypass is enabled without an OTP value.
+    - Startup fails if bypass is enabled in prod profile.
+    - JWT initialization fails in prod if secret is under 32 bytes.
+
+
 
 
 

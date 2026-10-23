@@ -39,14 +39,14 @@ public class OtpService {
     @Value("${app.auth.superadmin-otp-bypass.enabled:false}")
     private boolean superadminBypassEnabled;
 
-    @Value("${app.auth.superadmin-otp-bypass.otp-value:749261}")
+    @Value("${app.auth.superadmin-otp-bypass.otp-value:}")
     private String superadminFixedOtp;
 
     @Value("${app.auth.superadmin-otp-bypass.email:super.admin@probus.io}")
     private String superadminEmail;
 
     // PARITY: In-memory store fallback allowed in dev/test; prohibited in prod.
-    @Value("${app.auth.otp.allow-memory-fallback:true}")
+    @Value("${app.auth.otp.allow-memory-fallback:false}")
     private boolean allowMemoryFallback;
 
     @Value("${spring.mail.username:}")
@@ -54,6 +54,9 @@ public class OtpService {
 
     @Value("${app.mail.from:\"Prolt Operations Centre\" <proltenergy.operations@probus.io>}")
     private String mailFrom;
+
+    @Autowired(required = false)
+    private org.springframework.core.env.Environment environment;
 
     public record StoredOtp(String otp, Instant expiresAt) {}
     private final Map<String, StoredOtp> inMemoryStore = new ConcurrentHashMap<>();
@@ -64,6 +67,19 @@ public class OtpService {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
         this.mailSender = mailSender;
+    }
+
+    @jakarta.annotation.PostConstruct
+    public void validateStartupConfiguration() {
+        if (superadminBypassEnabled) {
+            boolean isProd = environment != null && java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod");
+            if (isProd) {
+                throw new IllegalStateException("FATAL: Superadmin OTP bypass cannot be enabled in the 'prod' profile!");
+            }
+            if (superadminFixedOtp == null || superadminFixedOtp.isBlank()) {
+                throw new IllegalStateException("FATAL: Superadmin OTP bypass is enabled, but app.auth.superadmin-otp-bypass.otp-value is not configured!");
+            }
+        }
     }
 
     public void generateAndSendOtp(String email) {
