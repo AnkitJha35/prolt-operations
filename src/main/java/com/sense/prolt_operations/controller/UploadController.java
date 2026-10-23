@@ -43,7 +43,19 @@ public class UploadController {
             @RequestParam(value = "action", required = false) String action) {
 
         if (file == null || file.isEmpty()) {
-            throw new BadRequestException("File upload failed");
+            throw new BadRequestException("No file provided for upload.");
+        }
+        if (file.getSize() > 50L * 1024 * 1024) {
+            throw new BadRequestException("File size exceeds the 50MB limit.");
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename != null) {
+            String lower = originalFilename.toLowerCase();
+            if (!lower.endsWith(".csv") && !lower.endsWith(".xlsx") && !lower.endsWith(".xls") && !lower.endsWith(".xlxs")) {
+                int dotIdx = originalFilename.lastIndexOf('.');
+                String ext = dotIdx >= 0 ? originalFilename.substring(dotIdx).toLowerCase() : "";
+                throw new BadRequestException("Unsupported file extension: " + ext + ". Only .csv, .xlsx, .xls are allowed.");
+            }
         }
         if (market == null || market.trim().isEmpty()) {
             throw new BadRequestException("Market type is required.");

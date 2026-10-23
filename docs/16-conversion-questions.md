@@ -57,6 +57,26 @@ The following table reflects a 100% comprehensive audit across all 18 route file
 | UP Market | `/api/up-market` | None (Public) | `.requestMatchers("/api/up-market/**").permitAll()` | None | Exact Parity |
 | Health Probes | `/health`, `/health/database` | None (Public) | `.requestMatchers("/health", "/health/**").permitAll()` | None | Exact Parity |
 
+---
+
+## 3. Upload and Body Limits Parity
+
+- **Global Limits**: Configured `spring.servlet.multipart.max-file-size=50MB` and `max-request-size=50MB`, matching Node's `express.json({ limit: '50mb' })`, `urlencoded({ limit: '50mb' })`, and base `multer` config (`50MB`).
+- **Tomcat Part Count**: Default Tomcat max part count (50 parts) rejected requests uploading 200 files. Configured `server.tomcat.max-part-count=250` in `application.properties` and added `TomcatConfig` customizer setting `maxPartCount=250` and `maxParameterCount=10000`.
+- **Per-Endpoint Multer Limits**:
+  - `POST /api/trader-performance/upload`: 10MB per file limit, max 200 files.
+    - Exceeding file count (> 200) returns HTTP 400 `{"success":false,"message":"Too many files"}`.
+    - Exceeding file size (> 10MB) returns HTTP 400 `{"success":false,"message":"File too large"}`.
+  - `POST /api/trader-performance-daily/upload`: 25MB per file limit, max 200 files.
+    - Exceeding file count (> 200) returns HTTP 400 `{"success":false,"message":"Too many files"}`.
+    - Exceeding file size (> 25MB) returns HTTP 400 `{"success":false,"message":"File too large"}`.
+  - `POST /api/uploads`: 50MB file size limit, allowed extensions `.csv`, `.xlsx`, `.xls`, `.xlxs`.
+    - Missing file returns HTTP 400 `{"success":false,"message":"No file provided for upload."}`.
+    - Invalid extension returns HTTP 400 `{"success":false,"message":"Unsupported file extension: <ext>. Only .csv, .xlsx, .xls are allowed."}`.
+    - Exceeding 50MB returns HTTP 400 `{"success":false,"message":"File size exceeds the 50MB limit."}`.
+- **Exception Translation**: `RestControllerAdvisor.handleMaxUploadSizeExceededException` intercepts Spring's global `MaxUploadSizeExceededException` and formats HTTP 400 responses matching Node's Multer error format.
+
+
 
 
 

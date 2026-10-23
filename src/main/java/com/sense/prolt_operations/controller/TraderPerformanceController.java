@@ -32,6 +32,17 @@ public class TraderPerformanceController {
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadTradeReports(@RequestParam("files") List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "No files provided"));
+        }
+        if (files.size() > 200) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Too many files"));
+        }
+        for (MultipartFile file : files) {
+            if (file.getSize() > 10L * 1024 * 1024) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "File too large"));
+            }
+        }
         List<Map<String, Object>> reports = traderPerformanceService.uploadTradeReports(files);
         return ResponseEntity.ok(Map.of("success", true, "data", reports));
     }

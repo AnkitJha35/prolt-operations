@@ -342,6 +342,24 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Spoofed first IP in `X-Forwarded-For` is ignored in favor of the authentic last IP.
     - Upload limiter enforces 30-request threshold on `POST /api/uploads` and leaves `GET /api/uploads/health` unthrottled.
 
+### Hardening 5: Upload and body limits
+- **Date**: 2026-10-23
+- **Actions**:
+  - `application.properties`: Configured `server.tomcat.max-part-count=250`, `server.tomcat.max-parameter-count=10000`, and `server.tomcat.max-swallow-size=50MB` to prevent Tomcat's default 50-part limit from rejecting 200-file batches.
+  - `TomcatConfig`: Registered a `TomcatServletWebServerFactory` customizer setting `maxPartCount=250` and `maxParameterCount=10000` on Tomcat connectors.
+  - `TraderPerformanceController`: Enforced 200-file limit and 10MB per-file size limit on `POST /api/trader-performance/upload`. Rejections return HTTP 400 `{"success":false,"message":"Too many files"}` and `{"success":false,"message":"File too large"}` matching Multer error semantics.
+  - `TraderPerformanceDailyController`: Enforced 200-file limit and 25MB per-file size limit on `POST /api/trader-performance-daily/upload`.
+  - `UploadController`: Added validation on `POST /api/uploads` checking file presence, 50MB ceiling, and allowed extensions (`.csv`, `.xlsx`, `.xls`, `.xlxs`), returning matching HTTP 400 messages.
+  - `RestControllerAdvisor`: Added `handleMaxUploadSizeExceededException` mapping Spring's `MaxUploadSizeExceededException` to HTTP 400 `{"success":false,"message":"File size exceeds the 50MB limit."}` on `/api/uploads` and `{"success":false,"message":"File too large"}` elsewhere.
+  - Documented complete upload limit configuration and error translation in `docs/16-conversion-questions.md` Section 3.
+  - Created `UploadLimitsIntegrationTest` verifying:
+    - 200 small files upload successfully to trader performance without Tomcat part-count rejection.
+    - Exceeding file count (> 200 files) returns HTTP 400 `{"success":false,"message":"Too many files"}`.
+    - File exceeding 10MB on trader performance returns HTTP 400 `{"success":false,"message":"File too large"}`.
+    - File exceeding 25MB on trader performance daily returns HTTP 400 `{"success":false,"message":"File too large"}`.
+    - Unsupported file extension on `/api/uploads` is rejected with HTTP 400 matching Node multer filter.
+
+
 
 
 

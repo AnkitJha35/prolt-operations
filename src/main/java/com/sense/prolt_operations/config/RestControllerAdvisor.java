@@ -64,6 +64,19 @@ public class RestControllerAdvisor extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(status).body(new ErrorResponse("Invalid request body. Please provide a valid JSON payload."));
     }
 
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest webRequest) {
+        log.error("Max upload size exceeded: {}", ex.getMessage());
+        String uri = ((ServletWebRequest) webRequest).getRequest().getRequestURI();
+        String message = "File too large";
+        if (uri != null && uri.startsWith("/api/uploads")) {
+            message = "File size exceeds the 50MB limit.";
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(message));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String message = String.format("Argument '%s' is invalid.", ex.getName());
