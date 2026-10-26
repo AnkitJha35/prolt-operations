@@ -9,7 +9,7 @@ This document records any ambiguities, discrepancies, edge cases, or known Node.
 | 3 | Admin Role Hierarchy | `backend/src/middleware/admin.middleware.ts` | `adminMiddleware` explicitly checks `req.user.role !== 'ADMIN'` without checking `SUPER_ADMIN`. | Ported faithfully: only `ADMIN` is permitted on routes guarded solely by `adminMiddleware`, matching Node parity. |
 | 4 | Superadmin OTP Backdoor | `backend/src/modules/auth/otp.service.ts` | Hardcoded bypass for `super.admin@probus.io` with fixed OTP `749261`. | Preserved for test/dev via `app.auth.superadmin-otp-bypass.enabled=true` with property-based OTP value (`app.auth.superadmin-otp-bypass.otp-value`). Disabled (`false`) in production profile. |
 | 5 | In-Memory OTP Store vs Redis | `backend/src/modules/auth/otp.service.ts` vs Doc 06 | Node stored OTP in a local Map; Doc 06 requested Redis. | In-memory fallback allowed only in `dev` and `test` profiles (`app.auth.otp.allow-memory-fallback=true`). In `prod` (`allow-memory-fallback=false`), if Redis is unavailable, logs ERROR and fails request with 500. |
-| 6 | `/api/auth/me` Response Property | `backend/src/modules/auth/auth.controller.ts:L51` vs Doc 02 | Node code returns `{ success: true, user }` while Doc 02 / Swagger states `{ success: true, data }`. | Provided both `user` and `data` fields in response payload, ensuring full backwards compatibility with all clients. |
+| 6 | `/api/auth/me` Response Property | `backend/src/modules/auth/auth.controller.ts:L51` and `utils/jwt.ts` vs Doc 02 / Swagger | Node returns `{ success: true, user }`, where `user` is the decoded JWT payload (`id`, `username`, `role`, module arrays, `iat`, `exp`). | The Java response and newly issued JWTs now match Node exactly: no `data`, `email`, `name`, or JWT `sub` field. |
 | 7 | Dual Route Aliases for OTP | `backend/src/modules/auth/auth.routes.ts` vs Doc 12 | Node defined `/send-otp` and `/verify-otp`, while Doc 12 scenario AUTH-02/03 referenced `/otp/generate` and `/otp/verify`. | Decision applied: Removed `/otp/generate` and `/otp/verify`. Kept only canonical `/send-otp` and `/verify-otp`. Corrected 12-test-baseline.md scenarios. |
 | 8 | Singular Route Paths (`/api/proposal`, `/api/dataset`, `/api/api-log`) | `backend/src/app.ts` vs Docs 02/12/14/15 & Swagger | Singular paths appear in IEX-Dashboard docs 02/12/14/15 and Swagger comments, but Node never served them (Node only mounts plural `/api/proposals`, `/api/datasets`, and `/api/logs`). | Removed invented singular routes from controllers, security config, and tests to match Node authority exactly. Kept real double mount `/api/forecast` and `/forecast`. |
 
@@ -324,3 +324,29 @@ Local development defaults have been moved into `src/main/resources/application-
   - Runtime profiles (`application-dev.properties` and `application-prod.properties`) define neither property, ensuring that baselining is fail-closed and must be explicitly enabled via environment variables during cutover.
   - `spring.jpa.hibernate.ddl-auto=validate` is strictly enforced across all runtime profiles (dev, prod, default), ensuring that any schema discrepancies between JPA entity definitions and the PostgreSQL database halt startup immediately.
   - Documented the cutover procedure in `README.md` ("Cutover against an existing database") and verified both scratch migration and existing database baselining in `FlywayBaselineIntegrationTest.java`.
+
+---
+
+## 15. OTP Input and Mail-Delivery Parity
+
+- **Exact input matching**: Node treats only `null`/missing and empty strings as absent. It neither trims nor lowercases OTP emails or OTP values. `OtpService` and `AuthService` now retain the supplied values for repository lookup, bypass comparison, storage keys, and verification. Consequently, whitespace-only emails reach the lookup and a differently cased email is not treated as the same user.
+- **Mail failure**: Node stores the OTP before attempting delivery. A delivery failure reaches its production global handler as HTTP 500 `{ "success": false, "message": "Something went very wrong!" }`. Java now preserves that ordering, logs the delivery failure without the OTP, and throws `AppBaseException` with the same public message.
+- **Intentional production security deviation**: Node logs an OTP whenever SMTP is unconfigured, including in production. Java logs the OTP only when `app.auth.otp.allow-memory-fallback=true` (dev/test). With fallback disabled, it emits a generic message containing neither the email nor OTP; OTP login cannot complete without a configured mail transport and Redis. This avoids placing authentication secrets in production logs.
+- **Intentional bypass deviation**: Node's fixed super-admin OTP bypass is always enabled. Java retains the bypass only when explicitly enabled outside the `prod` profile; startup fails if it is enabled in `prod`.
+
+---
+
+## 16. Resource Center Complete CRUD Field Mapping
+
+- **Node Authority Comparison**:
+  - In Node, Prisma models delegate queries with dynamic property mappings. In `state-tariff`, an internal discrepancy existed between `resource-center.validator.ts` and the rest of the application (Prisma schema, database DDL, frontend UI, calculation engines).
+- **Spring Boot Behavior**:
+  - Implemented Option A (Canonical Schema Alignment) approved in `docs/20-resource-center-schema-audit.md`.
+  - `persistSingleRecord` and `updateSingleRecord` in `ResourceCenterService` now populate and mutate 100% of entity fields across all 9 resource types without omitting NOT NULL columns or ignoring updates.
+  - Aligned `NotFoundException` message to `"Record not found"` and audit log `tableName` to camelCase `modelName`.
+
+---
+
+## Deferred decisions
+
+Questions requiring an approved data source or product-owner decision are maintained separately in `docs/19-deferred-decisions.md`. The current entries cover initial master-data loading and the long-term operator workflow for Resource Center bulk updates.

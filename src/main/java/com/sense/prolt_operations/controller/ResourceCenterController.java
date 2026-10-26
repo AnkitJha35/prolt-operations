@@ -1,8 +1,11 @@
 package com.sense.prolt_operations.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,9 +29,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class ResourceCenterController {
 
     private final ResourceCenterService resourceCenterService;
+    private final ObjectMapper objectMapper;
 
-    public ResourceCenterController(ResourceCenterService resourceCenterService) {
+    public ResourceCenterController(ResourceCenterService resourceCenterService, ObjectMapper objectMapper) {
         this.resourceCenterService = resourceCenterService;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping("/{resourceType}")
@@ -63,35 +68,53 @@ public class ResourceCenterController {
     @Operation(summary = "Bulk create resource center records", description = "Creates or upserts multiple records in the specified table")
     public ResponseEntity<Map<String, Object>> createBulkResourceRecords(
             @PathVariable("resourceType") String resourceType,
-            @RequestBody(required = false) List<Map<String, Object>> payload) {
+            @RequestBody(required = false) JsonNode payload) {
 
-        if (payload == null || payload.isEmpty()) {
+        // Match Node: validate the resource type before examining the body.
+        resourceCenterService.assertSupportedResourceType(resourceType);
+        if (payload == null || !payload.isArray()) {
             throw new BadRequestException("Payload must be an array of records");
         }
 
-        List<?> results = resourceCenterService.createBulkResourceRecords(resourceType, payload);
+        List<Map<String, Object>> validPayload = new ArrayList<>();
+        for (JsonNode record : payload) {
+            if (!record.isObject()) {
+                throw new BadRequestException("Invalid payload format");
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> values = objectMapper.convertValue(record, Map.class);
+            if (!isBlank(values)) {
+                validPayload.add(values);
+            }
+        }
+
+        List<?> results = resourceCenterService.createBulkResourceRecords(resourceType, validPayload);
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
             "success", true,
-            "message", String.format("Bulk uploaded %d records successfully", payload.size()),
+            "message", String.format("Bulk uploaded %d records successfully", validPayload.size()),
             "data", results
         ));
+    }
+
+    private boolean isBlank(Map<String, Object> payload) {
+        return payload.values().stream()
+            .allMatch(value -> value == null || value.toString().trim().isEmpty());
     }
 
     @PutMapping("/{resourceType}/{id}")
     @Operation(summary = "Update resource center record", description = "Updates a record by ID")
     public ResponseEntity<Map<String, Object>> updateResourceRecord(
             @PathVariable("resourceType") String resourceType,
-            @PathVariable("id") Integer id,
+            @PathVariable("id") String id,
             @RequestBody(required = false) Map<String, Object> payload) {
 
-        if (id == null || id <= 0) {
-            throw new BadRequestException("Invalid ID format");
-        }
+        Integer numId = parseId(id);
         if (payload == null || payload.isEmpty()) {
             throw new BadRequestException("Payload cannot be empty");
         }
 
-        Object updated = resourceCenterService.updateResourceRecord(resourceType, id, payload);
+        Object updated = resourceCenterService.updateResourceRecord(resourceType, numId, payload);
         return ResponseEntity.ok(Map.of(
             "success", true,
             "message", "Record updated successfully",
@@ -103,16 +126,28 @@ public class ResourceCenterController {
     @Operation(summary = "Delete resource center record", description = "Deletes a record by ID")
     public ResponseEntity<Map<String, Object>> deleteResourceRecord(
             @PathVariable("resourceType") String resourceType,
-            @PathVariable("id") Integer id) {
+            @PathVariable("id") String id) {
 
-        if (id == null || id <= 0) {
-            throw new BadRequestException("Invalid ID format");
-        }
-
-        resourceCenterService.deleteResourceRecord(resourceType, id);
+        Integer numId = parseId(id);
+        resourceCenterService.deleteResourceRecord(resourceType, numId);
         return ResponseEntity.ok(Map.of(
             "success", true,
             "message", "Record deleted successfully"
         ));
+    }
+
+    private Integer parseId(String id) {
+        if (id == null) {
+            throw new BadRequestException("Invalid ID format");
+        }
+        try {
+            int num = Integer.parseInt(id.trim());
+            if (num <= 0) {
+                throw new BadRequestException("Invalid ID format");
+            }
+            return num;
+        } catch (NumberFormatException e) {
+            throw new BadRequestException("Invalid ID format");
+        }
     }
 }

@@ -573,3 +573,52 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - `d952258 Accounts 4: Flyway baseline configuration, documentation, and migration tests`
   - Updated progress tracking in `docs/18-progress.md` and recorded all findings and deviations in `docs/16-conversion-questions.md`.
 
+## OTP parity and production-safe delivery handling
+
+- Preserved Node's exact email and OTP comparison behavior: no trimming and no case normalization in request validation, user lookup, bypass comparison, OTP keys, or verification.
+- Changed mail delivery failures from a swallowed/logged error into an HTTP 500-compatible `AppBaseException` after persisting the OTP, with the public message `Something went very wrong!`.
+- Kept the deliberate production protections: the fixed super-admin bypass cannot run in `prod`, and an OTP is logged only when the dev/test memory fallback is expressly enabled.
+- Added `OtpServiceTest` coverage for exact matching, case-sensitive bypass behavior, post-storage mail failure, and safe OTP logging.
+
+## JWT and `/api/auth/me` parity
+
+- Verified `IEX-Dashboard/backend/src/utils/jwt.ts` and `auth.controller.ts`: Node issues JWTs containing only `id`, `username`, `role`, `hiddenModules`, `readOnlyModules`, `iat`, and `exp`; `/me` returns that decoded payload under `user`.
+- Removed Java-only `email` and `sub` claims, and removed Java-only `email`, `name`, and duplicate `data` response properties from `/api/auth/me`.
+- Added `iat` and `exp` to the Java principal response and expanded the authentication integration assertion to enforce the exact public shape.
+
+## Container runtime parity for browser scraping
+
+- Replaced the Alpine Java runtime image with Debian Bookworm and copied the Temurin JRE into it. This avoids Ubuntu's Snap-backed Chromium package, which cannot launch in a container.
+- Configured `PUPPETEER_EXECUTABLE_PATH` for the existing Playwright scraper. This matches the Node deployment's system-Chromium approach and avoids Alpine/musl browser-runtime incompatibility.
+
+## Resource Center bulk request-boundary parity
+
+- Aligned `POST /api/resource-center/:resourceType/bulk` with Node at the HTTP boundary: the resource type is checked before the body, only an array is accepted, an empty array succeeds with zero records, and fully blank object rows are ignored.
+- Added coverage for empty-array, blank-row, non-array, and unsupported-resource inputs. This work does not add, update, delete, export, or seed master data.
+
+## City/State registry parity
+
+- Aligned `GET /api/database/city-state` ordering with Node: state name ascending, then city name ascending.
+- Aligned create handling with Node by trimming city/state names, accepting numeric JSON strings for population and coordinates, rejecting null required values, and returning Node's duplicate city/state message.
+
+## Resource Center API Parity
+
+### Resource Center 1: Complete CRUD field mapping
+- **Date**: 2026-10-26
+- **Actions**:
+  - Implemented complete field-by-field persistence and update mapping across all 9 Resource Center master tables in `ResourceCenterService.java`:
+    - `region-state`: Added `regionalGrid`, `regionCode`, `stateCode`, and `stateOrUt` (mapping to `StateUtEnum.state` / `StateUtEnum.ut`) for both create and update.
+    - `discom-list`: Added `code`, `stateCode`, `discomType` updates; preserved `legalName` update.
+    - `ists-charges`: Mapped `startDate`, `endDate`, and `istsLossPercent` across create and update.
+    - `iex-fees`: Added update support for `exchangeFeesGst`, `nldcApplicationFees`, `nldcSchedulingFees`, `sldcSchedulingFees`, and `otherFixCharges`.
+    - `prolt-margin`: Added update support for `customerId`, `tradingMargin`, `tradingMarginGst`, and `proltMarginGst`.
+    - `ctu-charges`: Mapped `state`, `month`, and `ctu_charges_rs_per_kwh` across create and update.
+    - `state-charges`: Added update support for `category`, `supplyVoltageCategory`, `voltageLevel`, `demandFixedChargeKvaPerMonthRs`, `distributionWheelingCharges`, `stuCharges`, `stuLossPercent`, `wheelingLossPercent`, `additionalCharge`, and `discom`.
+    - `state-tariff`: Fully mapped all 14 canonical database fields on create (`consumerCategory`, `subCategory`, `supplyVoltageCategory`, `supplyVoltage`, `month`, `todStartTime`, `todEndTime`, `baseEnergyRate`, `baseEnergyUnit`, `todChargePercent`, `energyRate`, `discom`, `consumptionMonth`) and added comprehensive update handling for each.
+    - `fppa-charges`: Added update support for `month` and `billingMonth`.
+  - Aligned error messages with Node:
+    - Updated `NotFoundException` message from `"Record not found with ID: " + id` to `"Record not found"`.
+    - Updated `getResourceData` unsupported message to `"Unsupported resource type"`.
+  - Aligned audit logging table names in `ResourceCenterService.logAudit` to use camelCase `modelName` (`regionState`, `discomList`, `istsCharges`, `iexFees`, `proltMargin`, `ctuCharges`, `stateCharges`, `stateTariff`, `fppaCharges`) matching Node's `AuditLogService`.
+  - Added `ResourceCenterIntegrationTest.java` verifying full CRUD across all 9 resource types and 404/400 error responses.
+
