@@ -312,3 +312,15 @@ Local development defaults have been moved into `src/main/resources/application-
   - Tests create their own users, generate their own JWT tokens, and clean up users after test execution.
   - OTP bypass tests explicitly provision a super-admin user with `super.admin@probus.io` rather than expecting one from migrations.
   - Automated integration test in `RepositoryIntegrationTest` verifies that a fresh Flyway migration from scratch against an empty database leaves exactly zero rows in `"public"."User"`.
+
+---
+
+## 14. Flyway Baseline Configuration and Existing Database Cutover
+
+- **Node Authority Comparison (Prisma)**:
+  - In Node, Prisma manages schema changes via `prisma migrate deploy` or `prisma db push` using an internal `_prisma_migrations` tracking table. Prisma does not provide standard forward-only SQL baseline mechanisms for multi-schema architectures.
+- **Spring Boot Behavior (`Flyway`)**:
+  - `application.properties` enables operator-controlled baselining via `spring.flyway.baseline-on-migrate=${FLYWAY_BASELINE_ON_MIGRATE:false}` and `spring.flyway.baseline-version=${FLYWAY_BASELINE_VERSION:1}`.
+  - Runtime profiles (`application-dev.properties` and `application-prod.properties`) define neither property, ensuring that baselining is fail-closed and must be explicitly enabled via environment variables during cutover.
+  - `spring.jpa.hibernate.ddl-auto=validate` is strictly enforced across all runtime profiles (dev, prod, default), ensuring that any schema discrepancies between JPA entity definitions and the PostgreSQL database halt startup immediately.
+  - Documented the cutover procedure in `README.md` ("Cutover against an existing database") and verified both scratch migration and existing database baselining in `FlywayBaselineIntegrationTest.java`.

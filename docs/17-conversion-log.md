@@ -541,3 +541,22 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Replaced `testFlywayBaselineAndSeededUsers` in `RepositoryIntegrationTest` with `testFreshFlywayMigrationLeavesZeroRowsInUserTable`: executes Flyway migrations against an isolated fresh database from scratch and asserts exactly zero rows in `"public"."User"`.
   - Audited `src/test` with `git grep -E '\$2[aby]\$'`: zero bcrypt string literals remain anywhere in the test suite.
   - Recorded differences in `docs/16-conversion-questions.md` Section 13.
+
+### Accounts 4: Flyway baseline configuration, documentation, and migration tests
+- **Date**: 2026-10-26
+- **Actions**:
+  - Configured Flyway baseline properties in `src/main/resources/application.properties`:
+    - `spring.flyway.baseline-on-migrate=${FLYWAY_BASELINE_ON_MIGRATE:false}`
+    - `spring.flyway.baseline-version=${FLYWAY_BASELINE_VERSION:1}`
+  - Verified that neither `application-dev.properties` nor `application-prod.properties` contains baseline overrides (requiring explicit operator environment configuration).
+  - Verified that `spring.jpa.hibernate.ddl-auto=validate` is strictly enforced across all runtime profiles.
+  - Authored a comprehensive operator runbook in `README.md` titled `"Cutover against an existing database"` detailing:
+    - Pre-cutover PostgreSQL database backup (`pg_dump`).
+    - One-time startup with `FLYWAY_BASELINE_ON_MIGRATE=true` and `FLYWAY_BASELINE_VERSION=5`.
+    - Rationale for why baseline version 1 is incorrect for an existing database and why databases that ran historical V5 migrations require recreation due to checksum mismatches and weak credentials.
+    - Verification of Hibernate entity validation on startup.
+    - Reverting environment variables to `FLYWAY_BASELINE_ON_MIGRATE=false` for fail-closed ongoing operation.
+  - Created integration test suite `FlywayBaselineIntegrationTest.java`:
+    - Case A (Migration from scratch): Migrates an empty database from version 1 to 5, asserts all migrations apply cleanly and zero rows exist in `User`.
+    - Case B (Existing database baseline): Simulates pre-existing database tables and existing application rows (`HolidayCalendar`), baselines at version 5 with `baselineOnMigrate=true`, asserts `flyway_schema_history` records the baseline row at version 5, zero subsequent migrations execute, and existing data is intact.
+  - Documented findings in `docs/16-conversion-questions.md` Section 14.

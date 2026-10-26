@@ -100,6 +100,47 @@ docker run -d \
 
 ---
 
+## 🔄 Cutover against an existing database
+
+When migrating from the legacy Node.js/Prisma backend or attaching `prolt-operations` to a pre-existing production or staging database, follow this operational runbook to establish the Flyway schema history baseline safely.
+
+### 1. Step 1: Perform a Full Database Backup
+Before initiating cutover, take a full logical backup of the existing PostgreSQL database:
+```bash
+pg_dump -h <host> -U <user> -d <database> -F c -b -v -f pre_cutover_backup_$(date +%Y%m%d_%H%M%S).dump
+```
+
+### 2. Step 2: Establish the Flyway Baseline
+A database provisioned by the legacy Node/Prisma schema already contains all domain tables (`User`, `Holiday`, `DamRecord`, etc.), matching schema version 5.
+- **Why Baseline Version 1 is Wrong**: If you baseline at version 1 (`FLYWAY_BASELINE_VERSION=1`), Flyway considers only version 1 accounted for and will attempt to execute subsequent migrations against the existing database. Although V2–V5 contain placeholder statements in the current version, baselining at version 5 accurately marks the entire existing schema state as accounted for.
+- **Why Recreation is Required for Old V5 Migrations**: If the database was previously initialized or migrated using the earlier, historical version of `V5__seed_initial_admin_data.sql` (which seeded fixed accounts and hashes), Flyway will detect a migration checksum mismatch because V5 has been modified to a clean placeholder. Modifying applied migration scripts causes Flyway validation failures (`Migration checksum mismatch for migration version 5`). Furthermore, databases migrated with the old V5 contain insecure seeded default accounts. Such databases must not be cut over; they must be dropped, recreated cleanly, and repopulated with legitimate data.
+
+To baseline the existing database, start the application **once** with baseline flags enabled:
+```bash
+FLYWAY_BASELINE_ON_MIGRATE=true \
+FLYWAY_BASELINE_VERSION=5 \
+SPRING_PROFILES_ACTIVE=prod \
+DATABASE_URL="jdbc:postgresql://<host>:5432/<database>?stringtype=unspecified" \
+POSTGRES_USER="<user>" \
+POSTGRES_PASSWORD="<password>" \
+java -jar prolt-operations.jar
+```
+Flyway will detect the existing non-empty schema, create `public.flyway_schema_history`, record a single baseline row at version 5, and skip executing past migrations.
+
+### 3. Step 3: Verify Hibernate Validation
+On startup, Hibernate runs with `spring.jpa.hibernate.ddl-auto=validate` across all runtime profiles.
+- Confirm in the startup logs that Hibernate validates all JPA entities against the existing database schema without throwing `SchemaManagementException`.
+- Verify the application logs output: `Schema "public" is up to date. No migration necessary.` followed by `AppRunner initialized successfully.`
+
+### 4. Step 4: Revert Environment Variables (Fail-Closed Operation)
+Once the baseline row is recorded in `flyway_schema_history`, immediately revert the environment variables for subsequent runs and normal operational service configurations:
+- Remove `FLYWAY_BASELINE_ON_MIGRATE` (or set `FLYWAY_BASELINE_ON_MIGRATE=false`).
+- Remove `FLYWAY_BASELINE_VERSION`.
+
+Reverting to `FLYWAY_BASELINE_ON_MIGRATE=false` ensures a fail-closed posture: any future schema drift, unexpected manual table changes, or unapplied migrations will fail fast at startup rather than being silently ignored.
+
+---
+
 ## 📡 API Endpoint Catalogue (117 Endpoints)
 
 All endpoints maintain 1:1 route signature, method, and query param parity with legacy Express routing:
