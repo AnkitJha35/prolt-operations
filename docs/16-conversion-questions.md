@@ -307,7 +307,7 @@ Local development defaults have been moved into `src/main/resources/application-
 - **Node Authority Comparison**:
   - In Node, automated testing scripts and manual testing rely on pre-existing users populated by `prisma db seed` (`admin`, `client`).
 - **Spring Boot Behavior**:
-  - All test dependencies on fixed seed users (`admin`, `superadmin`, `client`) and hardcoded bcrypt password hashes (`$2a$10$...`) have been completely eliminated from the test suite.
+  - All test dependencies on fixed seed users (`admin`, `superadmin`, `client`) and hardcoded bcrypt password hash literals have been completely eliminated from the test suite.
   - Introduced `TestUserHelper` (and base methods on `BaseIntegrationTest`) which provisions ephemeral test accounts with per-run unique usernames, emails, and randomly generated passwords hashed dynamically via `PasswordEncoder`.
   - Tests create their own users, generate their own JWT tokens, and clean up users after test execution.
   - OTP bypass tests explicitly provision a super-admin user with `super.admin@probus.io` rather than expecting one from migrations.

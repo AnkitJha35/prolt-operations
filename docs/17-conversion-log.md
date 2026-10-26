@@ -560,3 +560,16 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - Case A (Migration from scratch): Migrates an empty database from version 1 to 5, asserts all migrations apply cleanly and zero rows exist in `User`.
     - Case B (Existing database baseline): Simulates pre-existing database tables and existing application rows (`HolidayCalendar`), baselines at version 5 with `baselineOnMigrate=true`, asserts `flyway_schema_history` records the baseline row at version 5, zero subsequent migrations execute, and existing data is intact.
   - Documented findings in `docs/16-conversion-questions.md` Section 14.
+
+### Accounts 5: Verification and cleanup
+- **Date**: 2026-10-26
+- **Actions**:
+  - Executed offline `./mvnw clean verify -o`: 112 tests across all test suites passed cleanly with zero failures and zero errors (1 test skipped: `ScraperLiveManualTest` annotated with `@Disabled`).
+  - Ran `git grep -E '\$2[aby]\$' src/ README.md docs/` to verify zero remaining bcrypt hashes across source code, test code, configuration, README, and markdown documentation.
+  - Summarized all commits and hashes for the Accounts and Flyway initiative:
+    - `34cc451 Accounts 1: Clean Flyway seed migrations and remove seeded data claims`
+    - `fc75a6b Accounts 2: AppRunner admin user provisioning and password policy`
+    - `a71030c Accounts 3: Remove test dependencies on seeded users and introduce test user helper`
+    - `d952258 Accounts 4: Flyway baseline configuration, documentation, and migration tests`
+  - Updated progress tracking in `docs/18-progress.md` and recorded all findings and deviations in `docs/16-conversion-questions.md`.
+
