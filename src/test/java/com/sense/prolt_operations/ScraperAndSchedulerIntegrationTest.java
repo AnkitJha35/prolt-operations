@@ -55,19 +55,17 @@ public class ScraperAndSchedulerIntegrationTest extends BaseIntegrationTest {
     private AppScheduler appScheduler;
 
     private String validJwtToken;
+    private com.sense.prolt_operations.testutil.TestUserHelper.TestUser testUser;
 
     @BeforeEach
     void setUp() {
-        User user = userRepository.findByUsername("admin")
-                .orElseGet(() -> {
-                    User u = User.create();
-                    u.setUsername("admin");
-                    u.setEmail("admin@probus.io");
-                    u.setPasswordHash("$2a$10$Rv4pjBCD9Lh7c4x1QTgxtO8uCxvpzt5tuDhdOn5VtLGAkJAKvl/cm");
-                    u.setRole(Role.ADMIN);
-                    return userRepository.save(u);
-                });
-        validJwtToken = jwtService.generateToken(user);
+        testUser = createTestUser(Role.ADMIN);
+        validJwtToken = testUser.getToken();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        deleteTestUser(testUser);
     }
 
     private List<Map<String, Object>> create96SampleRecords(String date) {

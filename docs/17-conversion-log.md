@@ -517,3 +517,27 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - All three blank logs INFO and creates nothing.
     - Log appender inspection asserts no password appears in any log event.
   - Recorded Node differences in `docs/16-conversion-questions.md` Section 12.
+
+### Accounts 3: Tests no longer use seeded users and introduce test user helper
+- **Date**: 2026-10-26
+- **Actions**:
+  - Created `TestUserHelper.java` in `com.sense.prolt_operations.testutil`:
+    - Generates isolated test user entities with dynamic unique usernames and emails per test method to prevent concurrency collisions.
+    - Uses `PasswordEncoder` to dynamically hash random per-run passwords.
+    - Generates signed JWT tokens with claims populated from the test user.
+    - Exposes lifecycle cleanup (`deleteUser`).
+  - Added helper methods (`createTestUser`, `deleteTestUser`) to `BaseIntegrationTest`.
+  - Refactored all test suites that previously relied on seeded accounts or hardcoded bcrypt hash literals:
+    - `CalculationAndTariffIntegrationTest`
+    - `MarketAndScraperIntegrationTest`
+    - `ProposalAndDocumentIntegrationTest`
+    - `ScraperAndSchedulerIntegrationTest`
+    - `FullParityIntegrationTest`
+    - `AuthenticationParityIntegrationTest`
+    - `ActuatorAndSwaggerHardeningTest`
+    - `LandingPriceParityIntegrationTest`
+    - `AuthAndUserIntegrationTest`: updated OTP bypass tests to create their own super-admin account (`super.admin@probus.io`), login tests use dynamically generated credentials.
+    - `RepositoryIntegrationTest`: removed hardcoded bcrypt hash literal from `testUserCrudOperations`.
+  - Replaced `testFlywayBaselineAndSeededUsers` in `RepositoryIntegrationTest` with `testFreshFlywayMigrationLeavesZeroRowsInUserTable`: executes Flyway migrations against an isolated fresh database from scratch and asserts exactly zero rows in `"public"."User"`.
+  - Audited `src/test` with `git grep -E '\$2[aby]\$'`: zero bcrypt string literals remain anywhere in the test suite.
+  - Recorded differences in `docs/16-conversion-questions.md` Section 13.

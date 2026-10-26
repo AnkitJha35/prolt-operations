@@ -42,18 +42,17 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     private String adminToken;
+    private com.sense.prolt_operations.testutil.TestUserHelper.TestUser testUser;
 
     @BeforeEach
     void setUp() {
-        User user = userRepository.findByEmail("admin@iexdashboard.local").orElseGet(() -> {
-            User u = User.create();
-            u.setUsername("admin");
-            u.setEmail("admin@iexdashboard.local");
-            u.setPasswordHash("encoded");
-            u.setRole(Role.SUPER_ADMIN);
-            return userRepository.save(u);
-        });
-        adminToken = jwtService.generateToken(user);
+        testUser = createTestUser(Role.SUPER_ADMIN);
+        adminToken = testUser.getToken();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        deleteTestUser(testUser);
     }
 
     @Test

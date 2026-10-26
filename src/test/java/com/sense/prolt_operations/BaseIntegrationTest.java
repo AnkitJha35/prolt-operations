@@ -44,4 +44,21 @@ public abstract class BaseIntegrationTest {
         registry.add("management.endpoints.web.exposure.include", () -> "health,info,prometheus");
         registry.add("management.prometheus.metrics.export.enabled", () -> "true");
     }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    protected com.sense.prolt_operations.testutil.TestUserHelper testUserHelper;
+
+    protected com.sense.prolt_operations.testutil.TestUserHelper.TestUser createTestUser(com.sense.prolt_operations.entity.Role role) {
+        return testUserHelper.createUser(role);
+    }
+
+    protected com.sense.prolt_operations.testutil.TestUserHelper.TestUser createTestUser(com.sense.prolt_operations.entity.Role role, String username, String email) {
+        return testUserHelper.createUser(role, username, email);
+    }
+
+    protected void deleteTestUser(com.sense.prolt_operations.testutil.TestUserHelper.TestUser testUser) {
+        if (testUserHelper != null) {
+            testUserHelper.deleteUser(testUser);
+        }
+    }
 }

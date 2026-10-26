@@ -299,3 +299,16 @@ Local development defaults have been moved into `src/main/resources/application-
   - `AppRunner` enforces a password policy: the password must be at least 12 characters long and must not equal the username.
   - If a password policy violation occurs: an ERROR message is logged without printing the sensitive password. In `prod` profile, startup fails immediately by throwing an `IllegalStateException`; in non-prod profiles, admin creation is skipped and the application continues to start.
   - `AppRunner` never creates or manages a client user.
+
+---
+
+## 13. Decoupling Tests from Seeded Users
+
+- **Node Authority Comparison**:
+  - In Node, automated testing scripts and manual testing rely on pre-existing users populated by `prisma db seed` (`admin`, `client`).
+- **Spring Boot Behavior**:
+  - All test dependencies on fixed seed users (`admin`, `superadmin`, `client`) and hardcoded bcrypt password hashes (`$2a$10$...`) have been completely eliminated from the test suite.
+  - Introduced `TestUserHelper` (and base methods on `BaseIntegrationTest`) which provisions ephemeral test accounts with per-run unique usernames, emails, and randomly generated passwords hashed dynamically via `PasswordEncoder`.
+  - Tests create their own users, generate their own JWT tokens, and clean up users after test execution.
+  - OTP bypass tests explicitly provision a super-admin user with `super.admin@probus.io` rather than expecting one from migrations.
+  - Automated integration test in `RepositoryIntegrationTest` verifies that a fresh Flyway migration from scratch against an empty database leaves exactly zero rows in `"public"."User"`.

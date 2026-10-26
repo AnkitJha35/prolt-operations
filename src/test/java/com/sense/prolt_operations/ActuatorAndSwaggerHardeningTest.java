@@ -60,17 +60,22 @@ class ActuatorAndSwaggerHardeningTest extends BaseIntegrationTest {
                 .andExpect(status().isOk());
 
         // Prometheus requires authentication
-        String token = "Bearer " + jwtService.generateToken("admin", "admin", "admin@probus.io", Role.ADMIN, List.of(), List.of());
-        mockMvc.perform(get("/actuator/prometheus").header("Authorization", token))
-                .andExpect(status().isOk());
+        com.sense.prolt_operations.testutil.TestUserHelper.TestUser testUser = createTestUser(Role.ADMIN);
+        try {
+            String token = testUser.getBearerToken();
+            mockMvc.perform(get("/actuator/prometheus").header("Authorization", token))
+                    .andExpect(status().isOk());
 
-        // Without auth -> rejected with 401 Unauthorized
-        mockMvc.perform(get("/actuator/env")).andExpect(status().isUnauthorized());
+            // Without auth -> rejected with 401 Unauthorized
+            mockMvc.perform(get("/actuator/env")).andExpect(status().isUnauthorized());
 
-        // Even when authenticated as ADMIN, sensitive endpoints return 404 (disabled and excluded from web exposure)
-        mockMvc.perform(get("/actuator/env").header("Authorization", token)).andExpect(status().isNotFound());
-        mockMvc.perform(get("/actuator/heapdump").header("Authorization", token)).andExpect(status().isNotFound());
-        mockMvc.perform(get("/actuator/loggers").header("Authorization", token)).andExpect(status().isNotFound());
-        mockMvc.perform(get("/actuator/threaddump").header("Authorization", token)).andExpect(status().isNotFound());
+            // Even when authenticated as ADMIN, sensitive endpoints return 404 (disabled and excluded from web exposure)
+            mockMvc.perform(get("/actuator/env").header("Authorization", token)).andExpect(status().isNotFound());
+            mockMvc.perform(get("/actuator/heapdump").header("Authorization", token)).andExpect(status().isNotFound());
+            mockMvc.perform(get("/actuator/loggers").header("Authorization", token)).andExpect(status().isNotFound());
+            mockMvc.perform(get("/actuator/threaddump").header("Authorization", token)).andExpect(status().isNotFound());
+        } finally {
+            deleteTestUser(testUser);
+        }
     }
 }

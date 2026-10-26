@@ -50,44 +50,36 @@ class AuthenticationParityIntegrationTest extends BaseIntegrationTest {
     private String superAdminToken;
     private String expiredToken;
     private final String badToken = "invalid.malformed.token";
+    private com.sense.prolt_operations.testutil.TestUserHelper.TestUser clientTestUser;
+    private com.sense.prolt_operations.testutil.TestUserHelper.TestUser superAdminTestUser;
 
     @BeforeEach
     void setUp() {
-        User clientUser = userRepository.findByUsername("client")
-                .orElseGet(() -> {
-                    User u = User.create();
-                    u.setUsername("client");
-                    u.setEmail("client@iexdashboard.local");
-                    u.setPasswordHash("hashedpass");
-                    u.setRole(Role.CLIENT);
-                    return userRepository.save(u);
-                });
-        clientToken = jwtService.generateToken(clientUser);
+        clientTestUser = createTestUser(Role.CLIENT);
+        clientToken = clientTestUser.getToken();
 
-        User superAdminUser = userRepository.findByUsername("superadmin")
-                .orElseGet(() -> {
-                    User u = User.create();
-                    u.setUsername("superadmin");
-                    u.setEmail("super.admin@probus.io");
-                    u.setPasswordHash("hashedpass");
-                    u.setRole(Role.SUPER_ADMIN);
-                    return userRepository.save(u);
-                });
-        superAdminToken = jwtService.generateToken(superAdminUser);
+        superAdminTestUser = createTestUser(Role.SUPER_ADMIN);
+        superAdminToken = superAdminTestUser.getToken();
 
         // Generate expired token
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
         Date now = new Date();
         Date pastExpiry = new Date(now.getTime() - 3600_000); // 1 hour ago
         expiredToken = Jwts.builder()
-                .subject("client")
-                .claim("id", clientUser.getId())
-                .claim("username", "client")
+                .subject(clientTestUser.getUser().getUsername())
+                .claim("id", clientTestUser.getUser().getId())
+                .claim("username", clientTestUser.getUser().getUsername())
                 .claim("role", "CLIENT")
                 .issuedAt(new Date(now.getTime() - 7200_000))
                 .expiration(pastExpiry)
                 .signWith(Keys.hmacShaKeyFor(keyBytes))
                 .compact();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        deleteTestUser(clientTestUser);
+        deleteTestUser(superAdminTestUser);
     }
 
     @Test

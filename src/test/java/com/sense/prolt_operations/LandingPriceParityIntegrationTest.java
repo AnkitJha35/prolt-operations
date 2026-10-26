@@ -56,11 +56,18 @@ class LandingPriceParityIntegrationTest extends BaseIntegrationTest {
     private JwtService jwtService;
 
     private String token;
+    private com.sense.prolt_operations.testutil.TestUserHelper.TestUser testUser;
 
     @BeforeEach
     void setUp() {
         wireMockServer.resetAll();
-        token = "Bearer " + jwtService.generateToken("admin", "admin", "admin@probus.io", Role.ADMIN, List.of(), List.of());
+        testUser = createTestUser(Role.ADMIN);
+        token = testUser.getBearerToken();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        deleteTestUser(testUser);
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.sense.prolt_operations.repository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -36,16 +37,47 @@ public class RepositoryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private SavingsCalculatorEntryRepository savingsCalculatorEntryRepository;
 
-    @Test
-    void testFlywayBaselineAndSeededUsers() {
-        Optional<User> admin = userRepository.findByUsername("admin");
-        assertTrue(admin.isPresent(), "Admin user must be present from Flyway seed");
-        assertEquals(Role.ADMIN, admin.get().getRole());
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-        Optional<User> superadmin = userRepository.findByUsername("superadmin");
-        assertTrue(superadmin.isPresent(), "Superadmin user must be present from Flyway seed");
-        assertEquals(Role.SUPER_ADMIN, superadmin.get().getRole());
-        assertEquals("super.admin@probus.io", superadmin.get().getEmail());
+    @Test
+    void testFreshFlywayMigrationLeavesZeroRowsInUserTable() {
+        String freshDbName = "fresh_flyway_test_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        try (java.sql.Connection adminConn = java.sql.DriverManager.getConnection(
+                postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+             java.sql.Statement adminStmt = adminConn.createStatement()) {
+            adminStmt.execute("CREATE DATABASE \"" + freshDbName + "\"");
+        } catch (java.sql.SQLException e) {
+            fail("Failed to create temporary fresh database: " + e.getMessage());
+        }
+
+        String freshDbUrl = postgres.getJdbcUrl().replace("/Prolt_Operations", "/" + freshDbName);
+        try {
+            org.flywaydb.core.Flyway flyway = org.flywaydb.core.Flyway.configure()
+                    .dataSource(freshDbUrl, postgres.getUsername(), postgres.getPassword())
+                    .schemas("public", "forecasting")
+                    .defaultSchema("public")
+                    .locations("classpath:db/migration")
+                    .load();
+            flyway.migrate();
+
+            try (java.sql.Connection conn = java.sql.DriverManager.getConnection(
+                    freshDbUrl, postgres.getUsername(), postgres.getPassword());
+                 java.sql.Statement stmt = conn.createStatement();
+                 java.sql.ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM \"public\".\"User\"")) {
+                assertTrue(rs.next());
+                assertEquals(0, rs.getLong(1), "Fresh Flyway migration from scratch must leave exactly zero rows in User");
+            }
+        } catch (Exception e) {
+            fail("Failed to verify User table count in fresh Flyway migration: " + e.getMessage());
+        } finally {
+            try (java.sql.Connection adminConn = java.sql.DriverManager.getConnection(
+                    postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+                 java.sql.Statement adminStmt = adminConn.createStatement()) {
+                adminStmt.execute("DROP DATABASE IF EXISTS \"" + freshDbName + "\" WITH (FORCE)");
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     @Test
@@ -54,7 +86,7 @@ public class RepositoryIntegrationTest extends BaseIntegrationTest {
         User user = User.create();
         user.setUsername(testUsername);
         user.setEmail(testUsername + "@probus.io");
-        user.setPasswordHash("$2a$10$dummyHashValueForTestingOnly");
+        user.setPasswordHash(passwordEncoder.encode("TestCrudUserPass123!"));
         user.setRole(Role.CLIENT);
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
