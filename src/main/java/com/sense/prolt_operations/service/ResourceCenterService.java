@@ -99,7 +99,11 @@ public class ResourceCenterService {
 
     public Object createResourceRecord(String resourceType, Map<String, Object> payload) {
         assertSupportedResourceType(resourceType);
+        if (payload == null || payload.isEmpty()) {
+            throw new BadRequestException("Payload cannot be empty");
+        }
         Map<String, Object> sanitized = sanitizePayload(payload);
+        validateRequiredFields(resourceType, sanitized);
         checkDateOverlaps(resourceType, List.of(sanitized));
 
         Object saved = persistSingleRecord(resourceType, sanitized);
@@ -110,6 +114,11 @@ public class ResourceCenterService {
     public List<?> createBulkResourceRecords(String resourceType, List<Map<String, Object>> payloads) {
         assertSupportedResourceType(resourceType);
         List<Map<String, Object>> sanitizedList = payloads.stream().map(this::sanitizePayload).toList();
+        for (Map<String, Object> p : sanitizedList) {
+            if (!p.containsKey("id") || p.get("id") == null) {
+                validateRequiredFields(resourceType, p);
+            }
+        }
         checkDateOverlaps(resourceType, sanitizedList);
 
         List<Object> results = new ArrayList<>();
@@ -568,18 +577,61 @@ public class ResourceCenterService {
         return null;
     }
 
+    private void validateRequiredFields(String resourceType, Map<String, Object> p) {
+        List<String> required = switch (resourceType) {
+            case "region-state" -> List.of("stateName");
+            case "discom-list" -> List.of("legalName");
+            case "ists-charges" -> List.of("startDate", "endDate", "istsLossPercent");
+            case "iex-fees" -> List.of("month");
+            case "prolt-margin" -> List.of("month", "customerId");
+            case "ctu-charges" -> List.of("state", "month");
+            case "state-charges" -> List.of("state", "fromDate", "toDate");
+            case "state-tariff" -> List.of("state", "month");
+            case "fppa-charges" -> List.of("state", "month");
+            default -> List.of();
+        };
+
+        for (String field : required) {
+            Object val = switch (field) {
+                case "stateName" -> getValue(p, "stateName", "state_name", "state");
+                case "legalName" -> getValue(p, "legalName", "legal_name", "discom");
+                case "startDate" -> getValue(p, "startDate", "start_date");
+                case "endDate" -> getValue(p, "endDate", "end_date");
+                case "istsLossPercent" -> getValue(p, "istsLossPercent", "ists_loss_percent");
+                case "month" -> getValue(p, "month", "Month", "billMonth", "bill_month");
+                case "customerId" -> getValue(p, "customerId", "customer_id");
+                case "state" -> getValue(p, "state");
+                case "fromDate" -> getValue(p, "fromDate", "from_date");
+                case "toDate" -> getValue(p, "toDate", "to_date");
+                default -> p.get(field);
+            };
+
+            if (val == null || (val instanceof String s && s.trim().isEmpty())) {
+                throw new BadRequestException("Validation error: " + field + " is required");
+            }
+        }
+    }
+
     private Integer getInteger(Map<String, Object> p, String... keys) {
         return getInteger(p, null, keys);
     }
 
     private Integer getInteger(Map<String, Object> p, Integer defaultValue, String... keys) {
+        String fieldName = keys != null && keys.length > 0 ? keys[0] : "value";
         for (String k : keys) {
             if (p.containsKey(k) && p.get(k) != null) {
                 String str = cleanNumericString(p.get(k));
                 if (str != null) {
+                    int val;
                     try {
-                        return Integer.parseInt(str);
-                    } catch (Exception ignored) {}
+                        val = Integer.parseInt(str);
+                    } catch (Exception e) {
+                        throw new BadRequestException("Validation error: " + fieldName + " must be a finite number");
+                    }
+                    if (val < 0) {
+                        throw new BadRequestException("Validation error: " + fieldName + " cannot be negative");
+                    }
+                    return val;
                 }
             }
         }
@@ -591,13 +643,27 @@ public class ResourceCenterService {
     }
 
     private BigDecimal getDecimal(Map<String, Object> p, BigDecimal defaultValue, String... keys) {
+        String fieldName = keys != null && keys.length > 0 ? keys[0] : "value";
         for (String k : keys) {
             if (p.containsKey(k) && p.get(k) != null) {
                 String str = cleanNumericString(p.get(k));
                 if (str != null) {
+                    BigDecimal bd;
                     try {
-                        return new BigDecimal(str);
-                    } catch (Exception ignored) {}
+                        bd = new BigDecimal(str);
+                    } catch (Exception e) {
+                        throw new BadRequestException("Validation error: " + fieldName + " must be a finite number");
+                    }
+                    if (bd.compareTo(BigDecimal.ZERO) < 0 && !"fppaChargePercent".equals(fieldName) && !"fppa_charge_percent".equals(fieldName) && !"charges".equals(fieldName)) {
+                        throw new BadRequestException("Validation error: " + fieldName + " cannot be negative");
+                    }
+                    if (("istsLossPercent".equals(fieldName) || "ists_loss_percent".equals(fieldName)
+                            || "stuLossPercent".equals(fieldName) || "stu_loss_percent".equals(fieldName)
+                            || "wheelingLossPercent".equals(fieldName) || "wheeling_loss_percent".equals(fieldName))
+                            && bd.compareTo(BigDecimal.valueOf(100)) > 0) {
+                        throw new BadRequestException("Validation error: " + fieldName + " cannot exceed 100");
+                    }
+                    return bd;
                 }
             }
         }

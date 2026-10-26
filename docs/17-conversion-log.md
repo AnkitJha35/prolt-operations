@@ -630,3 +630,13 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Added robust numeric cleaning regex `(?i)[%₹,\s]|rs\.?` in `ResourceCenterService.cleanNumericString`, stripping currency symbols, commas, percent signs, and whitespace before decimal/integer conversion.
   - Added integration tests `RC-09` and `RC-10` in `ResourceCenterIntegrationTest.java` verifying CTU property serialization/aliasing and formatted string parsing.
 
+### Resource Center 3: Domain validation and duplicate error handling
+- **Date**: 2026-10-26
+- **Actions**:
+  - Implemented `@ExceptionHandler(DataIntegrityViolationException.class)` in `RestControllerAdvisor.java` returning HTTP 409 Conflict with standard error payload `{"success": false, "message": "Record already exists (Duplicate Conflict)"}` on unique key/index collisions (`uq_`, `23505`, `duplicate key`).
+  - Added `validateRequiredFields` in `ResourceCenterService` enforcing mandatory fields across all 9 resource types on create and bulk create.
+  - Implemented domain bounds checking in `getDecimal` and `getInteger` (finite number checking, non-negative bounds with explicit exception for `fppaChargePercent` which can be negative, and loss percentages capped at 100).
+  - Flexible month parsing and validation in `parseMonth` supporting 1-12, YYYYMM, YYYY-MM, MM/YYYY, and full/abbreviated month names.
+  - Added integration tests `RC-11` and `RC-12` in `ResourceCenterIntegrationTest.java` verifying 409 duplicate responses and domain validation rules.
+
+

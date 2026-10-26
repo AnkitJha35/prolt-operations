@@ -358,6 +358,19 @@ Local development defaults have been moved into `src/main/resources/application-
 
 ---
 
+## 18. Domain Validation and Duplicate Key Conflict Handling
+
+- **Node Authority Comparison**:
+  - In Node, Prisma throws `P2002` error on unique constraint violations, which the global error handler intercepts and maps to `HTTP 409 Conflict` with `"Record already exists (Duplicate Conflict)"`.
+  - Node's `resource-center.validator.ts` checks required fields and range validations (e.g. loss percentages <= 100, month parsing for 1-12 and YYYYMM, negative numbers rejected except for FPPA charge adjustments).
+- **Spring Boot Behavior**:
+  - `RestControllerAdvisor` translates Spring's `DataIntegrityViolationException` containing PostgreSQL error code `23505` or unique index violations (`uq_`) into `HTTP 409 Conflict` with `ErrorResponse("Record already exists (Duplicate Conflict)")`.
+  - `ResourceCenterService.validateRequiredFields` enforces mandatory fields before persistence.
+  - Number parsers validate non-negative constraints (permitting negative `fppaChargePercent` as per domain requirements) and percentage caps (<= 100%).
+
+---
+
 ## Deferred decisions
 
 Questions requiring an approved data source or product-owner decision are maintained separately in `docs/19-deferred-decisions.md`. The current entries cover initial master-data loading and the long-term operator workflow for Resource Center bulk updates.
+

@@ -372,4 +372,97 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(delete("/api/resource-center/state-charges/" + id))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @DisplayName("RC-11: Duplicate record returns HTTP 409 Conflict with standard error message")
+    void testDuplicateConflictReturns409() throws Exception {
+        Map<String, Object> payload1 = Map.of(
+            "stateName", "Duplicate State Test",
+            "stateCode", "DUP_TEST"
+        );
+
+        MvcResult result1 = mockMvc.perform(post("/api/resource-center/region-state")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload1)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        int id1 = objectMapper.readTree(result1.getResponse().getContentAsString()).get("data").get("id").asInt();
+
+        try {
+            // Posting identical stateCode should trigger unique index violation -> 409 Conflict
+            mockMvc.perform(post("/api/resource-center/region-state")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(payload1)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.message").value("Record already exists (Duplicate Conflict)"));
+        } finally {
+            mockMvc.perform(delete("/api/resource-center/region-state/" + id1))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    @DisplayName("RC-12: Domain validation checks required fields, month format, and numerical bounds")
+    void testValidationErrors() throws Exception {
+        // Missing required field -> 400 Bad Request
+        mockMvc.perform(post("/api/resource-center/region-state")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("regionName", "North"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation error: stateName is required"));
+
+        // Invalid month format -> 400 Bad Request
+        mockMvc.perform(post("/api/resource-center/iex-fees")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("month", 13, "exchangeFees", 0.02))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation error: month must be between 1 and 12, or in YYYYMM format"));
+
+        mockMvc.perform(post("/api/resource-center/iex-fees")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("month", "invalid_month", "exchangeFees", 0.02))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation error: month must be a number or a valid month name"));
+
+        // Negative number check on istsLossPercent -> 400 Bad Request
+        mockMvc.perform(post("/api/resource-center/ists-charges")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "startDate", "2027-01-01",
+                    "endDate", "2027-01-31",
+                    "istsLossPercent", -2.5
+                ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation error: istsLossPercent cannot be negative"));
+
+        // Percentage > 100 on istsLossPercent -> 400 Bad Request
+        mockMvc.perform(post("/api/resource-center/ists-charges")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "startDate", "2027-01-01",
+                    "endDate", "2027-01-31",
+                    "istsLossPercent", 105.0
+                ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation error: istsLossPercent cannot exceed 100"));
+
+        // Negative fppaChargePercent is explicitly permitted -> 201 Created
+        MvcResult fppaRes = mockMvc.perform(post("/api/resource-center/fppa-charges")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "state", "West Bengal",
+                    "month", 202611,
+                    "fppaChargePercent", -1.8
+                ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.fppaChargePercent").value(-1.8))
+                .andReturn();
+
+        int fppaId = objectMapper.readTree(fppaRes.getResponse().getContentAsString()).get("data").get("id").asInt();
+        mockMvc.perform(delete("/api/resource-center/fppa-charges/" + fppaId))
+                .andExpect(status().isOk());
+    }
 }
+

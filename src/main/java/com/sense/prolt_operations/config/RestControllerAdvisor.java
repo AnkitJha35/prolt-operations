@@ -105,6 +105,29 @@ public class RestControllerAdvisor extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(status).body(new ErrorResponse(ex.getMessage()));
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        String msg = getRootMessage(ex);
+        if (msg.contains("duplicate key") || msg.contains("unique constraint") || msg.contains("uq_") || msg.contains("23505")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new ErrorResponse("Record already exists (Duplicate Conflict)"));
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("Data integrity violation: " + ex.getMessage()));
+    }
+
+    private String getRootMessage(Throwable t) {
+        StringBuilder sb = new StringBuilder();
+        while (t != null) {
+            if (t.getMessage() != null) {
+                sb.append(t.getMessage().toLowerCase()).append(" ");
+            }
+            t = t.getCause();
+        }
+        return sb.toString();
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAllUncaughtException(Exception ex) {
         log.error("Unhandled infrastructure exception 💥", ex);
