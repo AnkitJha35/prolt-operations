@@ -123,6 +123,28 @@ public class ResourceCenterService {
 
         List<Object> results = new ArrayList<>();
         for (Map<String, Object> p : sanitizedList) {
+            Object idVal = p.get("id");
+            Integer id = null;
+            if (idVal != null) {
+                if (idVal instanceof Number n) {
+                    id = n.intValue();
+                } else {
+                    try {
+                        id = Integer.parseInt(idVal.toString().trim());
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            if (id != null && id > 0) {
+                Object existing = findEntityById(resourceType, id);
+                if (existing != null) {
+                    Object updated = updateSingleRecord(resourceType, id, p, existing);
+                    logAudit(resourceType, String.valueOf(id), "UPDATE", existing, updated);
+                    results.add(updated);
+                    continue;
+                }
+            }
+
             Object saved = persistSingleRecord(resourceType, p);
             logAudit(resourceType, getEntityId(saved), "CREATE", null, saved);
             results.add(saved);

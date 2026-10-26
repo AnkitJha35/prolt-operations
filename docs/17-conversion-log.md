@@ -639,4 +639,12 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Flexible month parsing and validation in `parseMonth` supporting 1-12, YYYYMM, YYYY-MM, MM/YYYY, and full/abbreviated month names.
   - Added integration tests `RC-11` and `RC-12` in `ResourceCenterIntegrationTest.java` verifying 409 duplicate responses and domain validation rules.
 
+### Resource Center 4: Bulk upsert semantics
+- **Date**: 2026-10-26
+- **Actions**:
+  - Implemented ID-based bulk upsert semantics in `ResourceCenterService.createBulkResourceRecords`. When a payload contains a valid `id` corresponding to an existing record, the service executes `updateSingleRecord` and logs an `UPDATE` audit entry; otherwise it executes `persistSingleRecord` and logs a `CREATE` audit entry.
+  - Enforced `@Transactional` atomicity across all bulk operations, guaranteeing that any validation failure or constraint collision rolls back the entire batch.
+  - Added integration tests `RC-13` and `RC-14` in `ResourceCenterIntegrationTest.java` verifying mixed update/insert bulk execution and rollback atomicity.
+
+
 

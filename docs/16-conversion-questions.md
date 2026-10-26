@@ -370,7 +370,18 @@ Local development defaults have been moved into `src/main/resources/application-
 
 ---
 
+## 19. Resource Center Bulk Upsert Semantics
+
+- **Node Authority Comparison**:
+  - In Node, `createBulkResourceRecords` inspects each item in the payload array: if `payload.id` is present, it issues `prisma.<model>.upsert({ where: { id }, update, create })`; otherwise it issues `create`. The array of operations is executed within an atomic `prisma.$transaction`.
+- **Spring Boot Behavior**:
+  - `ResourceCenterService.createBulkResourceRecords` inspects each payload: if an `id` is present and matches an existing record, it performs an in-place update using `updateSingleRecord`; otherwise it validates required fields and persists a new record using `persistSingleRecord`.
+  - Transactional atomicity is guaranteed by Spring `@Transactional`, rolling back all changes if any record in the batch fails validation or database constraints.
+
+---
+
 ## Deferred decisions
 
 Questions requiring an approved data source or product-owner decision are maintained separately in `docs/19-deferred-decisions.md`. The current entries cover initial master-data loading and the long-term operator workflow for Resource Center bulk updates.
+
 

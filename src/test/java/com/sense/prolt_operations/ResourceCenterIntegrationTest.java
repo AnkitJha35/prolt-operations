@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
@@ -464,5 +465,80 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(delete("/api/resource-center/fppa-charges/" + fppaId))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @DisplayName("RC-13: Bulk upsert performs update when id is provided and create when id is omitted")
+    void testBulkUpsertMixedInsertAndUpdate() throws Exception {
+        // Step 1: Pre-create a record
+        Map<String, Object> initialPayload = Map.of(
+            "code", "DISCOM_UP1",
+            "legalName", "Discom Initial",
+            "stateCode", "DL"
+        );
+
+        MvcResult createRes = mockMvc.perform(post("/api/resource-center/discom-list")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(initialPayload)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        int id1 = objectMapper.readTree(createRes.getResponse().getContentAsString()).get("data").get("id").asInt();
+
+        try {
+            // Step 2: Post bulk payload with one update (id1) and one insert (new)
+            List<Map<String, Object>> bulkPayload = List.of(
+                Map.of("id", id1, "legalName", "Discom Updated In Bulk"),
+                Map.of("code", "DISCOM_UP2", "legalName", "Discom New In Bulk", "stateCode", "HR")
+            );
+
+            MvcResult bulkRes = mockMvc.perform(post("/api/resource-center/discom-list/bulk")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(bulkPayload)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data[0].id").value(id1))
+                    .andExpect(jsonPath("$.data[0].legalName").value("Discom Updated In Bulk"))
+                    .andExpect(jsonPath("$.data[1].code").value("DISCOM_UP2"))
+                    .andExpect(jsonPath("$.data[1].legalName").value("Discom New In Bulk"))
+                    .andReturn();
+
+            int id2 = objectMapper.readTree(bulkRes.getResponse().getContentAsString()).get("data").get(1).get("id").asInt();
+
+            // Step 3: Verify GET reflects both the update and the insert
+            mockMvc.perform(get("/api/resource-center/discom-list"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data[?(@.id == " + id1 + ")].legalName").value("Discom Updated In Bulk"))
+                    .andExpect(jsonPath("$.data[?(@.id == " + id2 + ")].legalName").value("Discom New In Bulk"));
+
+            // Cleanup id2
+            mockMvc.perform(delete("/api/resource-center/discom-list/" + id2))
+                    .andExpect(status().isOk());
+        } finally {
+            // Cleanup id1
+            mockMvc.perform(delete("/api/resource-center/discom-list/" + id1))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    @DisplayName("RC-14: Bulk operations execute within transaction and roll back on validation failure")
+    void testBulkRollbackOnAtomicFailure() throws Exception {
+        List<Map<String, Object>> failingBulkPayload = List.of(
+            Map.of("code", "DISCOM_ROLLBACK", "legalName", "Discom Valid", "stateCode", "PB"),
+            Map.of("code", "DISCOM_ERR", "stateCode", "DL") // Invalid: missing required legalName
+        );
+
+        mockMvc.perform(post("/api/resource-center/discom-list/bulk")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(failingBulkPayload)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation error: legalName is required"));
+
+        // Verify that DISCOM_ROLLBACK was NOT committed to the database
+        mockMvc.perform(get("/api/resource-center/discom-list"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.code == 'DISCOM_ROLLBACK')]").doesNotExist());
+    }
 }
+
 
