@@ -493,3 +493,27 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
 
 
 
+### Accounts 2: AppRunner admin user provisioning and password policy
+- **Date**: 2026-10-26
+- **Actions**:
+  - Modified `AppRunner.java`:
+    - Removed user update/overwrite branch. If an admin user already exists, logs at INFO and leaves the existing account untouched.
+    - Creates an admin account only when `app.admin.username`, `app.admin.email`, and `app.admin.password` are all non-blank.
+    - Explicitly assigns `Role.ADMIN` upon creation.
+    - Enforces password validation: minimum 12 characters and must not equal the username.
+    - When refusing invalid password: logs at ERROR without logging the password value. In `prod` profile, throws `IllegalStateException` halting application startup; in non-prod profiles, logs ERROR and skips creating the admin user without halting startup.
+    - If all three properties are blank (or partially blank), logs at INFO and skips admin creation.
+    - Ensured no client user seeding is performed.
+  - Verified property files:
+    - `application.properties`: uses empty env-var fallbacks (`${ADMIN_USERNAME:}`, `${ADMIN_EMAIL:}`, `${ADMIN_PASSWORD:}`).
+    - `application-dev.properties`: defines no `app.admin.password`.
+    - `application-prod.properties`: defines no `app.admin.*` properties.
+  - Created `AppRunnerTest.java` verifying:
+    - Missing admin created with `Role.ADMIN`.
+    - Existing admin left untouched (hash, role, email unchanged) and logs "already exists".
+    - Short password (<12 chars) refused, no user created, logs ERROR, password never in log.
+    - Password equal to username refused, no user created, logs ERROR, password never in log.
+    - Under `prod` profile, password policy refusal throws `IllegalStateException`.
+    - All three blank logs INFO and creates nothing.
+    - Log appender inspection asserts no password appears in any log event.
+  - Recorded Node differences in `docs/16-conversion-questions.md` Section 12.

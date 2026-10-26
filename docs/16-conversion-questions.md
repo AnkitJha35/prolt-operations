@@ -285,3 +285,17 @@ Local development defaults have been moved into `src/main/resources/application-
   - Migration `V5__seed_initial_admin_data.sql` contains `SELECT 1;` and seeds zero accounts. The first administrator account is created at runtime by `AppRunner` from validated environment variables.
 
 
+---
+
+## 12. Admin User Provisioning and Password Policy (AppRunner)
+
+- **Node Authority Comparison (`prisma/seed.ts`)**:
+  - In `IEX-Dashboard/backend/prisma/seed.ts`, the seed script creates an `ADMIN` user with username from `process.env.ADMIN_USERNAME || 'admin'` and a weak default password, plus a `CLIENT` user.
+  - Node performs no password complexity or length checks and does not check whether the password equals the username.
+- **Spring Boot Behavior (`AppRunner.java`)**:
+  - `AppRunner` creates an admin user on startup only when `app.admin.username`, `app.admin.email`, and `app.admin.password` are all non-blank.
+  - If all three properties are blank, `AppRunner` logs an INFO message and proceeds without creating any user.
+  - If an admin user already exists, `AppRunner` logs an INFO message and leaves the existing user untouched (no overwriting of existing password hashes, email, or role).
+  - `AppRunner` enforces a password policy: the password must be at least 12 characters long and must not equal the username.
+  - If a password policy violation occurs: an ERROR message is logged without printing the sensitive password. In `prod` profile, startup fails immediately by throwing an `IllegalStateException`; in non-prod profiles, admin creation is skipped and the application continues to start.
+  - `AppRunner` never creates or manages a client user.
