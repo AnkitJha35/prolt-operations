@@ -1,3 +1,4 @@
--- V4: Seed monitored cities & coordinates (from backend/src/scripts/seedCityStateData.ts)
--- Baseline master placeholder
+-- V4: City and state data migration placeholder
+-- This migration intentionally contains no data; a fresh database has no tariff,
+-- state charge or city data until a data-loading decision is made.
 SELECT 1;

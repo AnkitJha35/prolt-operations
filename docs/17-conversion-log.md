@@ -17,7 +17,7 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
 | 7 | `backend/src/cron/index.ts` | `SchedulerConfig.java` | `com.sense.prolt_operations.config` | `@EnableScheduling`, ShedLock configuration |
 | 8 | `backend/src/logger/index.ts` | `logback-spring.xml` | `src/main/resources` | Logback configuration with console & rolling file |
 | 9 | `backend/src/swagger.ts` | `SwaggerConfig.java` | `com.sense.prolt_operations.config` | SpringDoc OpenAPI 3 configuration |
-| 10 | `backend/src/reset_admin.ts` | `AdminBootstrapRunner.java` | `com.sense.prolt_operations.runner` | Seed check and default admin validation on startup |
+| 10 | `backend/src/reset_admin.ts` | `AdminBootstrapRunner.java` | `com.sense.prolt_operations.runner` | Initial admin check and validation on startup |
 | 11 | `backend/src/middleware/auth.middleware.ts` | `JwtAuthenticationFilter.java` | `com.sense.prolt_operations.security` | JWT auth filter parsing Bearer header |
 | 12 | `backend/src/middleware/admin.middleware.ts` | `@PreAuthorize("hasRole('ADMIN')")` | Controller annotations | Declarative Spring Security role check |
 | 13 | `backend/src/middleware/super-admin.middleware.ts` | `@PreAuthorize("hasRole('SUPER_ADMIN')")` | Controller annotations | Declarative Spring Security super-admin check |
@@ -84,10 +84,10 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Configured `pom.xml` with Java 21, Spring Boot 3.5.x parent, Spring Data JPA, PostgreSQL driver, Flyway (core + postgresql), JJWT, SpringDoc OpenAPI 2.x, Playwright, Jsoup, Apache POI (POI + OOXML), Apache PDFBox, JFreeChart, Bucket4j, ShedLock, Actuator, Mail, and Testcontainers.
   - Created Flyway migrations V1 to V5 in `src/main/resources/db/migration`:
     - `V1__Initial_Schema.sql`: Complete PostgreSQL DDL with schemas `public` and `forecasting`, custom ENUM types (`Role`, `MarketType`, `DatasetStatus`, `UploadAction`, `state_ut_enum`), 58 tables with exact columns, constraints, unique indexes, and foreign keys matching Prisma schema.
-    - `V2__seed_tariff_data.sql`: Tariff master data baseline.
-    - `V3__seed_updated_tariffs.sql`: Updated tariff master baseline.
-    - `V4__seed_city_state_data.sql`: Monitored cities & coordinates baseline.
-    - `V5__seed_initial_admin_data.sql`: Seeded default admin (`admin`), superadmin (`superadmin`), and client (`client`) users.
+    - `V2__seed_tariff_data.sql`: Placeholder migration (contains no data).
+    - `V3__seed_updated_tariffs.sql`: Placeholder migration (contains no data).
+    - `V4__seed_city_state_data.sql`: Placeholder migration (contains no data).
+    - `V5__seed_initial_admin_data.sql`: Placeholder migration (seeds no users; initial admin provisioned by AppRunner from environment variables).
   - Created all 5 Enums and 58 JPA entity classes:
     - 48 entities in `com.sense.prolt_operations.entity` for `public` schema.
     - 10 entities in `com.sense.prolt_operations.entity.forecasting` for `forecasting` schema.
@@ -100,7 +100,7 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - `./mvnw verify` executed successfully with 5 tests passing in `RepositoryIntegrationTest` and `ProltOperationsApplicationTests` against Testcontainers PostgreSQL 16.
   - Flyway migrations V1 through V5 applied with 0 errors.
   - Hibernate schema validation succeeded with `ddl-auto=validate`.
-  - Seeded users verified; CRUD operations verified for User, Dataset, DamRecord, SavingsCalculatorEntry.
+  - Entity CRUD operations verified for User, Dataset, DamRecord, SavingsCalculatorEntry.
 - **Deviations & Fixes:**
   - Resolved PostgreSQL custom ENUM string casting by adding `stringtype=unspecified` to JDBC connection string.
   - Mapped `@db.SmallInt` fields to Java `Short` to match PostgreSQL `int2` / JDBC `Types#SMALLINT`.
@@ -137,10 +137,9 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - `HealthController`: `@GetMapping("/health")` (`{"success": true, "status": "healthy"}`), `@GetMapping("/health/database")` (`{"success": true, "database": "connected"}`).
   - **Entities Updated:**
     - `User`: added `hiddenModules` (`String[]` / `text[]`), `readOnlyModules` (`String[]` / `text[]`), `@PrePersist` and `@PreUpdate` lifecycle callbacks.
-    - `UserAuditLog`: added `@PrePersist` callback for `timestamp`.
     - `UserRepository`: added `findAllByOrderByCreatedAtDesc()`.
     - `UserAuditLogRepository`: added `findAllByOrderByTimestampDesc()`.
-    - `AppRunner`: added automatic synchronization of seeded admin user password on startup.
+    - `AppRunner`: added initial admin provisioning from environment variables on startup.
 - **Verification & Parity:**
   - Integration tests in `AuthAndUserIntegrationTest` covering all scenarios:
     - `AUTH-01`: Standard login (200), missing credentials (400), invalid credentials (401).
@@ -481,5 +480,16 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
     - `jsoup` library dependency (removed from `pom.xml` and all java classes)
   - Updated `README.md` to reflect the current test suite, architecture, and route catalog.
   - Updated progress tracking in `docs/18-progress.md` with complete documentation for all 4 ingestion sections.
+
+## Accounts and Flyway
+
+### Accounts 1: Clean Flyway seed migrations and remove seeded data claims
+- **Date**: 2026-10-26
+- **Actions**:
+  - Replaced the contents of `V5__seed_initial_admin_data.sql` with explanatory comments and a single `SELECT 1;`. Migration seeds zero users; initial admin provisioning is handled dynamically at startup by `AppRunner` from environment variables.
+  - Replaced misleading comments in `V2__seed_tariff_data.sql`, `V3__seed_updated_tariffs.sql`, and `V4__seed_city_state_data.sql` with honest placeholder notices that migrations intentionally contain no data.
+  - Removed all statements in `README.md` and `docs/17-conversion-log.md` claiming migrations seed users, tariffs, charges, or cities.
+  - Documented in `docs/16-conversion-questions.md` Section 11: historical V5 hashes remaining in earlier git commits; security hazards of databases migrated with old V5; Node `prisma/seed.ts` analysis (creating weak admin/client accounts, missing super-admin, destructive `deleteMany()` table wipes, and unportable external spreadsheet dependencies).
+
 
 

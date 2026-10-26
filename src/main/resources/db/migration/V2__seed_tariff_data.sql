@@ -1,3 +1,4 @@
--- V2: Seed initial tariff master data (from backend/src/scripts/seed_tariff.ts)
--- Baseline master placeholder
+-- V2: Tariff data migration placeholder
+-- This migration intentionally contains no data; a fresh database has no tariff,
+-- state charge or city data until a data-loading decision is made.
 SELECT 1;

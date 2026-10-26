@@ -266,3 +266,22 @@ Local development defaults have been moved into `src/main/resources/application-
 - **Multilingual / Extended Date Format Support**: In addition to standard IEX format (`DD-Mon-YY`), `TradeReportParser` also accepts `DD-MM-YYYY` and `DD/MM/YYYY` formats with `Trading Date` or `TRADE DATE`, as well as `Entity ID` and `CLIENT CODE`.
 - **Upload Response Envelope**: For upload endpoints (`POST /api/trader-performance/upload` and `POST /api/trader-performance-daily/upload`), the unified response structure returns HTTP 200 with `success: true`, `data: files_status` (maintaining backward compatibility with part-count and list assertions in `UploadLimitsIntegrationTest`), `reports: results` (map of filename to parsed data), `files_status: files_status`, and `summary: { total_files, successful_files, failed_files }`.
 
+---
+
+## 11. Flyway Seed Migrations, Historical Hashes, and Data-Loading Parity
+
+### A. Historical V5 Password Hashes and Pre-existing Databases
+- **Git History**: The original `V5__seed_initial_admin_data.sql` script contained hardcoded bcrypt password hashes corresponding to weak default credentials (`admin`, `superadmin`, `client`). In accordance with policy, git history is intentionally not rewritten; these hashes remain in earlier git commits.
+- **Security Notice**: Any database ever initialized or migrated from the original V5 migration (whether local, test, or throwaway databases) contains three pre-seeded user accounts with weak passwords. Such databases must never be used for real data or production workloads and must be dropped/recreated.
+
+### B. Node Authority Comparison (`prisma/seed.ts` and Tariff Scripts)
+- **Node User Seeding**: In `IEX-Dashboard/backend/prisma/seed.ts`, Node provisions an `ADMIN` user (`process.env.ADMIN_USERNAME || 'admin'`) and a `CLIENT` user (`client`), both with weak default passwords. Node's seed script does **not** create a super-admin account.
+- **Node Data Wiping**:
+  - `prisma/seed.ts` performs `await prisma.stateCharges.deleteMany();` before attempting to ingest `backend_tables_updated - state_charges.csv` from candidate filesystem paths.
+  - Tariff seed scripts (`backend/src/scripts/seed_tariff.ts` and `seed_tariff_new.ts`) wipe the `stateTariff` table (`prisma.stateTariff.deleteMany()`) before parsing CSV/XLSX spreadsheets located outside the repository.
+- **Flyway Design in Spring Boot**:
+  - Destructive `deleteMany()` operations and reliance on external out-of-repo spreadsheets are unsuitable for repeatable, forward-only database schema migrations.
+  - Migrations `V2__seed_tariff_data.sql`, `V3__seed_updated_tariffs.sql`, and `V4__seed_city_state_data.sql` contain `SELECT 1;` placeholders with explicit notices that they contain no seed data. A fresh database has no tariff, state charge, or city data until an explicit data-loading decision is made.
+  - Migration `V5__seed_initial_admin_data.sql` contains `SELECT 1;` and seeds zero accounts. The first administrator account is created at runtime by `AppRunner` from validated environment variables.
+
+
