@@ -622,3 +622,11 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Aligned audit logging table names in `ResourceCenterService.logAudit` to use camelCase `modelName` (`regionState`, `discomList`, `istsCharges`, `iexFees`, `proltMargin`, `ctuCharges`, `stateCharges`, `stateTariff`, `fppaCharges`) matching Node's `AuditLogService`.
   - Added `ResourceCenterIntegrationTest.java` verifying full CRUD across all 9 resource types and 404/400 error responses.
 
+### Resource Center 2: Serialization and numeric normalization
+- **Date**: 2026-10-26
+- **Actions**:
+  - Annotated `CtuCharges.ctuChargesRsPerKwh` (and its getter/setter) with `@JsonProperty("ctu_charges_rs_per_kwh")` and `@JsonAlias({"ctuChargesRsPerKwh", "charge"})`.
+  - Verified JSON serialization matches Node and React frontend expectations (`ctu_charges_rs_per_kwh`).
+  - Added robust numeric cleaning regex `(?i)[%₹,\s]|rs\.?` in `ResourceCenterService.cleanNumericString`, stripping currency symbols, commas, percent signs, and whitespace before decimal/integer conversion.
+  - Added integration tests `RC-09` and `RC-10` in `ResourceCenterIntegrationTest.java` verifying CTU property serialization/aliasing and formatted string parsing.
+

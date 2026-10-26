@@ -347,6 +347,17 @@ Local development defaults have been moved into `src/main/resources/application-
 
 ---
 
+## 17. CTU Charge Property Serialization and Numeric Normalization
+
+- **Node Authority Comparison**:
+  - In Node, Prisma models map the DB column `ctu_charges_rs_per_kwh` as `ctu_charges_rs_per_kwh`, which the React frontend consumes directly.
+  - Node's `resource-center.validator.ts` sanitizes numeric strings by removing currency symbols (`₹`, `rs`), percentages, commas, and whitespace before numeric validation.
+- **Spring Boot Behavior**:
+  - `CtuCharges` field `ctuChargesRsPerKwh` is annotated with `@JsonProperty("ctu_charges_rs_per_kwh")` and `@JsonAlias({"ctuChargesRsPerKwh", "charge"})`, maintaining both snake_case JSON serialization parity and camelCase Java API compatibility.
+  - All numeric inputs in `ResourceCenterService` undergo regex-based stripping of `(?i)[%₹,\s]|rs\.?`, allowing incoming human-formatted spreadsheets/payloads (e.g., `"₹ 1,250.50"`, `"3.5%"`, `"rs. 0.15"`) to be parsed cleanly into `BigDecimal` and `Integer`.
+
+---
+
 ## Deferred decisions
 
 Questions requiring an approved data source or product-owner decision are maintained separately in `docs/19-deferred-decisions.md`. The current entries cover initial master-data loading and the long-term operator workflow for Resource Center bulk updates.

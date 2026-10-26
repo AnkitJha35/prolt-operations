@@ -1,5 +1,7 @@
 package com.sense.prolt_operations.entity;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -23,6 +25,8 @@ public class CtuCharges implements Serializable {
     @Column(name = "month")
     private Integer month;
 
+    @JsonProperty("ctu_charges_rs_per_kwh")
+    @JsonAlias({"ctuChargesRsPerKwh", "charge"})
     @Column(name = "ctu_charges_rs_per_kwh")
     private BigDecimal ctuChargesRsPerKwh;
 
@@ -68,10 +72,13 @@ public class CtuCharges implements Serializable {
         this.month = month;
     }
 
+    @JsonProperty("ctu_charges_rs_per_kwh")
     public BigDecimal getCtuChargesRsPerKwh() {
         return ctuChargesRsPerKwh;
     }
 
+    @JsonProperty("ctu_charges_rs_per_kwh")
+    @JsonAlias({"ctuChargesRsPerKwh", "charge"})
     public void setCtuChargesRsPerKwh(BigDecimal ctuChargesRsPerKwh) {
         this.ctuChargesRsPerKwh = ctuChargesRsPerKwh;
     }

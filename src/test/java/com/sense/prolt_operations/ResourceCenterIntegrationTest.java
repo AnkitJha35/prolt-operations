@@ -308,4 +308,68 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Invalid ID format"));
     }
+
+    @Test
+    @DisplayName("RC-09: CTU Charges JSON serialization matches ctu_charges_rs_per_kwh property name and aliases")
+    void testCtuChargesSerializationAndAliases() throws Exception {
+        Map<String, Object> payload = Map.of(
+            "state", "Karnataka",
+            "month", 202611,
+            "ctu_charges_rs_per_kwh", "₹ 0.45"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/resource-center/ctu-charges")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.ctu_charges_rs_per_kwh").value(0.45))
+                .andReturn();
+
+        int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
+
+        // Verify GET also returns ctu_charges_rs_per_kwh
+        mockMvc.perform(get("/api/resource-center/ctu-charges"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id == " + id + ")].ctu_charges_rs_per_kwh").value(0.45));
+
+        // Update with alternate property "charge" and "rs." prefix
+        mockMvc.perform(put("/api/resource-center/ctu-charges/" + id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("charge", "rs. 0.52"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.ctu_charges_rs_per_kwh").value(0.52));
+
+        mockMvc.perform(delete("/api/resource-center/ctu-charges/" + id))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("RC-10: Numeric normalization handles currency symbols, commas, percent, and whitespace")
+    void testNumericNormalization() throws Exception {
+        Map<String, Object> payload = Map.of(
+            "state", "Rajasthan",
+            "category", "Industrial",
+            "fromDate", "2027-04-01",
+            "toDate", "2027-04-30",
+            "crossSubsidy", "₹ 1,250.50",
+            "distributionWheelingCharges", "0.45 %",
+            "stuLossPercent", " 3.5% ",
+            "additionalCharge", "rs. 0.15"
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/resource-center/state-charges")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.crossSubsidy").value(1250.50))
+                .andExpect(jsonPath("$.data.distributionWheelingCharges").value(0.45))
+                .andExpect(jsonPath("$.data.stuLossPercent").value(3.5))
+                .andExpect(jsonPath("$.data.additionalCharge").value(0.15))
+                .andReturn();
+
+        int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
+
+        mockMvc.perform(delete("/api/resource-center/state-charges/" + id))
+                .andExpect(status().isOk());
+    }
 }
