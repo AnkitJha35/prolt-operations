@@ -49,7 +49,34 @@ This document tracks the execution status of each phase defined in `14-target-ar
 | Accounts 4 | Flyway baseline configuration, documentation, and migration tests | Done | 2026-10-26 12:00 | Configured `baseline-on-migrate` & `baseline-version` properties; authoring operator runbook in `README.md`; `FlywayBaselineIntegrationTest` (2 tests) |
 | Accounts 5 | Verification and cleanup | Done | 2026-10-26 12:05 | Full offline `./mvnw clean verify -o` (112 tests passing, 0 failures, 1 skipped); verified `git grep` zero bcrypt matches; updated progress and conversion log |
 
-**Total Integration & Unit Tests**: 112 passing tests across all modules (1 skipped live manual test).
+---
 
+## OTP parity and delivery safety
 
+| Work item | Status | Completed At | Notes |
+|---|---|---|---|
+| Exact OTP input semantics and mail failure parity | Done | 2026-10-26 14:25 | Removed trimming/case normalization; mail failure now returns generic 500 after OTP storage; production-safe logging and bypass restrictions retained; `OtpServiceTest` added. |
+| JWT and `/api/auth/me` payload parity | Done | 2026-10-26 14:30 | Removed Java-only JWT `email`/`sub` claims and `/me` `email`/`name`/`data` properties; retained Node payload fields including `iat` and `exp`. |
+| Container runtime for Playwright scraper | Done | 2026-10-26 14:40 | Replaced Alpine runtime with Debian-based Temurin and installed system Chromium configured at `/usr/bin/chromium`. |
+| Resource Center bulk request boundaries | Done | 2026-10-26 15:40 | Matched Node's empty-array and blank-row behavior, body type validation, and unsupported-resource error precedence; no master data changed. |
+| City/State registry validation and ordering | Done | 2026-10-26 15:45 | Matched Node ordering, input normalization, numeric-string conversion, required-field validation, and duplicate-entry response. |
+
+---
+
+## Resource Center API Parity Phases
+
+| Phase | Title | Status | Completed At | Notes |
+|---|---|---|---|---|
+| Resource Center 1 | Complete CRUD field mapping | Done | 2026-10-26 17:15 | Full entity field mapping across all 9 resource types (`persistSingleRecord`, `updateSingleRecord`); `ResourceCenterController` accepts string IDs; aligned audit log camelCase model names; `ResourceCenterIntegrationTest` (RC-01..RC-08) |
+| Resource Center 2 | Serialization and numeric normalization | Done | 2026-10-26 17:30 | `@JsonProperty("ctu_charges_rs_per_kwh")` and `@JsonAlias` on `CtuCharges`; regex-based cleaning `(?i)[%₹,\s]|rs\.?` for currency, percent, and formatting strings; `ResourceCenterIntegrationTest` (RC-09, RC-10) |
+| Resource Center 3 | Domain validation and duplicate error handling | Done | 2026-10-26 17:44 | `@ExceptionHandler(DataIntegrityViolationException.class)` translates unique key collisions (`23505`, `uq_`) to HTTP 409 Conflict with `"Record already exists (Duplicate Conflict)"`; domain validation and bounds checks; flexible month parsing; `ResourceCenterIntegrationTest` (RC-11, RC-12) |
+| Resource Center 4 | Bulk upsert semantics | Done | 2026-10-26 17:48 | In-place entity updates on bulk items with matching `id`, new record creation otherwise; `@Transactional` atomicity on bulk batch; `ResourceCenterIntegrationTest` (RC-13, RC-14) |
+| Resource Center 5 | Documentation and final verification | Done | 2026-10-26 17:55 | Offline `./mvnw clean verify -o` passed with 132 tests passing (1 skipped live manual test, 0 failures); updated progress tracking, conversion log, and deferred decisions register |
+
+## Deferred decisions register
+
+- Added `docs/19-deferred-decisions.md` to isolate product/data-source questions from completed migration work. Node remains the authority until each entry is decided.
+- D-03 resolved via Option A (Canonical Schema Alignment) in `docs/20-resource-center-schema-audit.md` and verified in Resource Center API Parity implementation.
+
+**Total Integration & Unit Tests**: 132 passing tests across all modules (1 skipped live manual test).
 

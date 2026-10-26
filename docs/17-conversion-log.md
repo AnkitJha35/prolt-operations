@@ -646,5 +646,10 @@ Architecture: Layered-by-type as per reference `mdm-adaptor` conventions:
   - Enforced `@Transactional` atomicity across all bulk operations, guaranteeing that any validation failure or constraint collision rolls back the entire batch.
   - Added integration tests `RC-13` and `RC-14` in `ResourceCenterIntegrationTest.java` verifying mixed update/insert bulk execution and rollback atomicity.
 
-
-
+### Resource Center 5: Documentation and final verification
+- **Date**: 2026-10-26
+- **Actions**:
+  - Executed full project test suite via `./mvnw clean verify -o`: 132 tests passed, 0 failures, 1 skipped (`ScraperLiveManualTest` intentionally disabled as an external live network test).
+  - Updated `docs/18-progress.md` tracking all 5 Resource Center API Parity checkpoints with complete notes.
+  - Updated `docs/19-deferred-decisions.md` marking `D-03` as resolved via Option A (Canonical Schema Alignment).
+  - Verified zero unapproved schema mutations or data corruption.
