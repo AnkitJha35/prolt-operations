@@ -61,8 +61,10 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://127.0.0.1:8089}
       NODE_ENV: staging
       RUN_SCRAPER: "false"
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+      MaxRAM: "1g"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8080/actuator/health || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 12
