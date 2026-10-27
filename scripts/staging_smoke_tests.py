@@ -308,9 +308,12 @@ def run_tests():
             "Content-Type": f"multipart/form-data; boundary={boundary}"
         }
         code, body, lat = request("POST", "/api/trader-performance/upload", multipart_body, headers=multipart_headers)
-        if code == 200 and isinstance(body, dict) and body.get("summary", {}).get("successful_files") == 1:
-            total_mwh = body.get("files", [{}])[0].get("data", {}).get("total_trade_mwh")
-            record("Trade Report: 96-Block PDF Parsing", "PASS", code, lat, f"1/1 files parsed, total_trade_mwh={total_mwh}")
+        files_list = body.get("files_status") or body.get("data") or []
+        first_file_data = files_list[0].get("data", {}) if (isinstance(files_list, list) and files_list) else {}
+        total_mwh = first_file_data.get("total_trade_mwh")
+        trade_rows = len(first_file_data.get("trades", []))
+        if code == 200 and isinstance(body, dict) and body.get("summary", {}).get("successful_files") == 1 and total_mwh is not None:
+            record("Trade Report: 96-Block PDF Parsing", "PASS", code, lat, f"1/1 files parsed, total_trade_mwh={total_mwh} MWh, rows={trade_rows}")
         else:
             record("Trade Report: 96-Block PDF Parsing", "FAIL", code, lat, str(body)[:100])
     else:

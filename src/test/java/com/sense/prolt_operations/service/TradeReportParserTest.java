@@ -200,6 +200,7 @@ class TradeReportParserTest {
                 pdfBytes
         );
         Map<String, Object> response = parser.parseFiles(List.of(file));
+        assertThat(response).containsKeys("success", "data", "reports", "files_status", "summary");
         assertThat(response.get("success")).isEqualTo(true);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> filesStatus = (List<Map<String, Object>>) response.get("files_status");
@@ -207,5 +208,12 @@ class TradeReportParserTest {
         assertThat(filesStatus.get(0).get("status")).isEqualTo("SUCCESS");
         assertThat(filesStatus.get(0).get("message")).isEqualTo("OK");
         assertThat(filesStatus.get(0).get("data")).isNotNull();
+        assertThat(response.get("data")).isEqualTo(filesStatus);
+        assertThat(response.get("reports")).isNotNull();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> summary = (Map<String, Object>) response.get("summary");
+        assertThat(summary.get("total_files")).isEqualTo(1);
+        assertThat(summary.get("successful_files")).isEqualTo(1);
+        assertThat(summary.get("failed_files")).isEqualTo(0);
     }
 }
