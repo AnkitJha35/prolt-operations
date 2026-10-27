@@ -87,6 +87,7 @@ This document tracks the execution status of each phase defined in `14-target-ar
 | Phase 8 | Local Staging Deployment & E2E Verification | Done | 2026-10-27 13:00 | Docker Compose staging environment (Java 21 Temurin, Postgres 16, Redis 7, Chromium); 52/52 smoke tests; RTO 8.26s local recovery; `docs/25-staging-deployment-execution-report.md` |
 | Phase 9 | Production Cutover Readiness Review | Done | 2026-10-27 14:00 | Conditional GO assessment; identified baseline v5 risk, single-writer matrix, master-data identity; `docs/26-production-cutover-readiness.md` |
 | Phase 10 | Production Migration Safety Audit & Cutover Simulation Planning | Done | 2026-10-27 14:35 | Flyway/Prisma schema audit (Baseline v5 vs 3 historic migrations); Single-Writer Transition Matrix (`RUN_SCRAPER=false` verified); Master-data un-keyed duplicate hazard analysis; PDF upload 5-key response contract verified; smoke test assertion corrected (52/52 PASS, 5.75 MWh); 14-point Cutover Simulation Runbook; `docs/27-production-migration-safety-audit.md` |
+| Phase 11 | Database Compatibility Evidence & Isolated Migration Rehearsal | Done | 2026-10-27 14:50 | Prisma vs Flyway migration matrix (58 canonical models vs 3 historic migrations); Baseline v5 empirical risk analysis; Isolated rehearsal in Testcontainers (`IsolatedMigrationRehearsalTest`, 3/3 passed); Read-only DBA checklist script (`scripts/dba_schema_verification.sql`); Master-data identity strategy; `docs/28-database-compatibility-evidence.md` |
 
-**Total Integration & Unit Tests**: 132 passing tests across all modules (1 skipped live manual test).
+**Total Integration & Unit Tests**: 135 passing tests across all modules (1 skipped live manual test).
 
