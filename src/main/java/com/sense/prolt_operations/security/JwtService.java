@@ -90,19 +90,17 @@ public class JwtService {
     public String generateToken(User user) {
         List<String> hidden = user.getHiddenModulesList();
         List<String> readOnly = user.getReadOnlyModulesList();
-        return generateToken(user.getId(), user.getUsername(), user.getEmail(), user.getRole(), hidden, readOnly);
+        return generateToken(user.getId(), user.getUsername(), user.getRole(), hidden, readOnly);
     }
 
-    public String generateToken(String id, String username, String email, Role role,
+    public String generateToken(String id, String username, Role role,
                                 List<String> hiddenModules, List<String> readOnlyModules) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMillis);
 
         return Jwts.builder()
-                .subject(username)
                 .claim("id", id)
                 .claim("username", username)
-                .claim("email", email)
                 .claim("role", role != null ? role.name() : Role.CLIENT.name())
                 .claim("hiddenModules", hiddenModules != null ? hiddenModules : Collections.emptyList())
                 .claim("readOnlyModules", readOnlyModules != null ? readOnlyModules : Collections.emptyList())
@@ -110,6 +108,15 @@ public class JwtService {
                 .expiration(expiry)
                 .signWith(signingKey)
                 .compact();
+    }
+
+    /**
+     * Retained for callers that still supply an email. Node's JWT payload never
+     * contained email, so the value is intentionally not serialized.
+     */
+    public String generateToken(String id, String username, String email, Role role,
+                                List<String> hiddenModules, List<String> readOnlyModules) {
+        return generateToken(id, username, role, hiddenModules, readOnlyModules);
     }
 
     public Claims getClaims(String token) {
@@ -139,16 +146,14 @@ public class JwtService {
         Claims claims = getClaims(token);
         String id = claims.get("id", String.class);
         String username = claims.get("username", String.class);
-        if (username == null) {
-            username = claims.getSubject();
-        }
-        String email = claims.get("email", String.class);
         String role = claims.get("role", String.class);
         List<String> hidden = claims.get("hiddenModules", List.class);
         List<String> readOnly = claims.get("readOnlyModules", List.class);
+        long issuedAt = claims.getIssuedAt() != null ? claims.getIssuedAt().getTime() / 1000 : 0;
+        long expiresAt = claims.getExpiration() != null ? claims.getExpiration().getTime() / 1000 : 0;
 
-        return new ProltUserPrincipal(id, username, email, role != null ? role : Role.CLIENT.name(),
+        return new ProltUserPrincipal(id, username, role != null ? role : Role.CLIENT.name(),
                 hidden != null ? hidden : Collections.emptyList(),
-                readOnly != null ? readOnly : Collections.emptyList());
+                readOnly != null ? readOnly : Collections.emptyList(), issuedAt, expiresAt);
     }
 }

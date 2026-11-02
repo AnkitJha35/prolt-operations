@@ -1037,7 +1037,7 @@ CREATE TABLE "public"."GdamMcpForecast" (
 
 -- CreateTable
 CREATE TABLE "public"."exchange_dam_rate" (
-    "id" SERIAL NOT NULL,
+    "id" BIGSERIAL NOT NULL,
     "date" DATE NOT NULL,
     "intervalTime" TIME NOT NULL,
     "mcp" DECIMAL(10,2),
@@ -1052,7 +1052,7 @@ CREATE TABLE "public"."exchange_dam_rate" (
 
 -- CreateTable
 CREATE TABLE "public"."exchange_rtm_rate" (
-    "id" SERIAL NOT NULL,
+    "id" BIGSERIAL NOT NULL,
     "date" DATE NOT NULL,
     "intervalTime" TIME NOT NULL,
     "mcp" DECIMAL(10,2),

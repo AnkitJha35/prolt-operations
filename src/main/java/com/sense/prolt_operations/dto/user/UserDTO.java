@@ -7,9 +7,13 @@ public record UserDTO(
     String id,
     String username,
     String email,
+    String fullName,
     String role,
     List<String> hiddenModules,
     List<String> readOnlyModules,
     LocalDateTime createdAt
 ) {
+    public UserDTO(String id, String username, String email, String role, List<String> hiddenModules, List<String> readOnlyModules, LocalDateTime createdAt) {
+        this(id, username, email, null, role, hiddenModules, readOnlyModules, createdAt);
+    }
 }

@@ -40,8 +40,18 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private com.sense.prolt_operations.service.OtpService otpService;
 
+    @Autowired(required = false)
+    private com.sense.prolt_operations.security.AuthRateLimiterFilter authRateLimiterFilter;
+
     private TestUserHelper.TestUser superAdminUser;
     private TestUserHelper.TestUser adminUser;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        if (authRateLimiterFilter != null) {
+            authRateLimiterFilter.getLimiter().reset();
+        }
+    }
 
     @AfterEach
     void tearDown() {
@@ -290,7 +300,12 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
                     .header("Authorization", meUser.getBearerToken()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.user.username").value(meUser.getUser().getUsername()));
+                    .andExpect(jsonPath("$.user.username").value(meUser.getUser().getUsername()))
+                    .andExpect(jsonPath("$.user.email").doesNotExist())
+                    .andExpect(jsonPath("$.user.name").doesNotExist())
+                    .andExpect(jsonPath("$.user.iat").isNumber())
+                    .andExpect(jsonPath("$.user.exp").isNumber())
+                    .andExpect(jsonPath("$.data").doesNotExist());
         } finally {
             deleteTestUser(meUser);
         }
@@ -319,6 +334,7 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
             {
                 "username": "%s",
                 "email": "%s",
+                "fullName": "Trader John",
                 "password": "SecurePassword123!",
                 "role": "CLIENT",
                 "hiddenModules": ["trader-performance", "admin-settings"],
@@ -334,6 +350,7 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.username").value(username))
                 .andExpect(jsonPath("$.data.email").value(email))
+                .andExpect(jsonPath("$.data.fullName").value("Trader John"))
                 .andExpect(jsonPath("$.data.role").value("CLIENT"))
                 .andReturn();
 
@@ -386,6 +403,7 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
             {
                 "username": "intruder_user",
                 "email": "intruder@probus.io",
+                "fullName": "Intruder User",
                 "password": "Password123!",
                 "role": "CLIENT"
             }
@@ -411,6 +429,7 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
                 {
                     "username": "%s",
                     "email": "%s",
+                    "fullName": "Duplicate User",
                     "password": "Password123!",
                     "role": "ADMIN"
                 }

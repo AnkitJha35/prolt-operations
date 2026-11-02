@@ -17,7 +17,7 @@ public class ExchangeRtmRate implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    private Integer id;
+    private Long id;
 
     @Column(name = "date")
     private LocalDate date;
@@ -50,7 +50,7 @@ public class ExchangeRtmRate implements Serializable {
         return new ExchangeRtmRate();
     }
 
-    public ExchangeRtmRate(Integer id, LocalDate date, LocalTime intervalTime, BigDecimal mcp, BigDecimal mcv) {
+    public ExchangeRtmRate(Long id, LocalDate date, LocalTime intervalTime, BigDecimal mcp, BigDecimal mcv) {
         this.id = id;
         this.date = date;
         this.intervalTime = intervalTime;
@@ -58,11 +58,11 @@ public class ExchangeRtmRate implements Serializable {
         this.mcv = mcv;
     }
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

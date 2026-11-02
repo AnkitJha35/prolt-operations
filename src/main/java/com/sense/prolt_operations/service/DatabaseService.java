@@ -190,26 +190,38 @@ public class DatabaseService {
     }
 
     public List<CityStateData> getCityStateData() {
-        return cityStateDataRepository.findAll();
+        return cityStateDataRepository.findAllByOrderByStateNameAscCityNameAsc();
     }
 
     @Transactional
     public CityStateData createCityStateData(Map<String, Object> data) {
         CityStateData entity = CityStateData.create();
-        entity.setCityName((String) data.get("cityName"));
-        entity.setStateName((String) data.get("stateName"));
-        if (data.get("population") != null) {
-            entity.setPopulation(((Number) data.get("population")).intValue());
+        entity.setCityName(data.get("cityName").toString().trim());
+        entity.setStateName(data.get("stateName").toString().trim());
+        if (cityStateDataRepository.existsByCityNameAndStateName(entity.getCityName(), entity.getStateName())) {
+            // Matches Node's Prisma P2002 handling for the city/state unique key.
+            throw new com.sense.prolt_operations.exception.AppBaseException("City and State entry already exists.");
         }
-        if (data.get("latitude") != null) {
-            entity.setLatitude(((Number) data.get("latitude")).doubleValue());
-        }
-        if (data.get("longitude") != null) {
-            entity.setLongitude(((Number) data.get("longitude")).doubleValue());
-        }
+        entity.setPopulation(asInteger(data.get("population")));
+        entity.setLatitude(asDouble(data.get("latitude")));
+        entity.setLongitude(asDouble(data.get("longitude")));
         entity.setCreatedAt(LocalDateTime.now());
         entity.setUpdatedAt(LocalDateTime.now());
         return cityStateDataRepository.save(entity);
+    }
+
+    private Integer asInteger(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return Integer.parseInt(value.toString());
+    }
+
+    private Double asDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return Double.parseDouble(value.toString());
     }
 
     public void exportDataAsCsvStream(String dataset, String startDate, String endDate, PrintWriter writer) {

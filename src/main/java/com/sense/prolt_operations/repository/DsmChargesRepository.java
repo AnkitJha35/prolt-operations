@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface DsmChargesRepository extends JpaRepository<DsmCharges, String>, JpaSpecificationExecutor<DsmCharges> {
+public interface DsmChargesRepository extends JpaRepository<DsmCharges, Integer>, JpaSpecificationExecutor<DsmCharges> {
 }

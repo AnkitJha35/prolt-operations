@@ -11,20 +11,23 @@ public class ProltUserPrincipal implements UserDetails {
 
     private final String id;
     private final String username;
-    private final String email;
     private final String role;
     private final List<String> hiddenModules;
     private final List<String> readOnlyModules;
+    private final long issuedAt;
+    private final long expiresAt;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public ProltUserPrincipal(String id, String username, String email, String role,
-                              List<String> hiddenModules, List<String> readOnlyModules) {
+    public ProltUserPrincipal(String id, String username, String role,
+                              List<String> hiddenModules, List<String> readOnlyModules,
+                              long issuedAt, long expiresAt) {
         this.id = id;
         this.username = username;
-        this.email = email;
         this.role = role;
         this.hiddenModules = hiddenModules != null ? hiddenModules : Collections.emptyList();
         this.readOnlyModules = readOnlyModules != null ? readOnlyModules : Collections.emptyList();
+        this.issuedAt = issuedAt;
+        this.expiresAt = expiresAt;
         this.authorities = List.of(
             new SimpleGrantedAuthority("ROLE_" + role),
             new SimpleGrantedAuthority(role)
@@ -33,10 +36,6 @@ public class ProltUserPrincipal implements UserDetails {
 
     public String getId() {
         return id;
-    }
-
-    public String getEmail() {
-        return email;
     }
 
     public String getRole() {
@@ -49,6 +48,14 @@ public class ProltUserPrincipal implements UserDetails {
 
     public List<String> getReadOnlyModules() {
         return readOnlyModules;
+    }
+
+    public long getIssuedAt() {
+        return issuedAt;
+    }
+
+    public long getExpiresAt() {
+        return expiresAt;
     }
 
     @Override

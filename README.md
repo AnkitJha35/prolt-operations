@@ -62,6 +62,8 @@ The application can be configured via environment variables or Spring configurat
 | `STARROCKS_PORT` | `9030` | StarRocks MySQL client port |
 | `IEX_CALCULATOR_API_URL` | `https://api.iexindia.com` | External landed price calculator base URL |
 
+OTP delivery requires Redis and SMTP in production. The application never logs OTP values when `ALLOW_MEMORY_FALLBACK=false`; do not enable the super-admin bypass in production.
+
 ---
 
 ## 🛠️ Build & Run
@@ -81,6 +83,9 @@ The application can be configured via environment variables or Spring configurat
 ```
 
 ### 3. Run with Docker
+
+The image includes Chromium because the market scraper uses Playwright. The browser executable is configured as `/usr/bin/chromium`; do not switch the Debian runtime image to Alpine or Ubuntu's Snap-backed Chromium without separately validating Playwright support.
+
 ```bash
 # Build Docker image
 docker build -t prolt-operations:latest .
@@ -249,7 +254,7 @@ The test suite leverages **Testcontainers** to spin up isolated PostgreSQL 16 in
 8. `FullParityIntegrationTest`: End-to-end verification of all subsystems, health checks, and Prometheus metrics.
 
 **Test Run Metrics**:
-- **Total Tests**: 102
+- **Total Tests**: 118
 - **Failures**: 0
 - **Errors**: 0
 - **Pass Rate**: 100%

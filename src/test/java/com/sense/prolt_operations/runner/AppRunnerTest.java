@@ -80,7 +80,7 @@ class AppRunnerTest {
         appRunner.setAdminEmail(email);
         appRunner.setAdminPassword(testPassword);
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findByNormalizedUsername(username)).thenReturn(Optional.empty());
         when(passwordEncoder.encode(testPassword)).thenReturn("encoded_admin_pass_stub");
 
         appRunner.run(new DefaultApplicationArguments());
@@ -116,7 +116,7 @@ class AppRunnerTest {
         existing.setPasswordHash("original_preserved_hash");
         existing.setRole(Role.ADMIN);
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(existing));
+        when(userRepository.findByNormalizedUsername(username)).thenReturn(Optional.of(existing));
 
         appRunner.run(new DefaultApplicationArguments());
 
@@ -141,7 +141,7 @@ class AppRunnerTest {
         appRunner.setAdminEmail(email);
         appRunner.setAdminPassword(shortPassword);
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findByNormalizedUsername(username)).thenReturn(Optional.empty());
 
         appRunner.run(new DefaultApplicationArguments());
 
@@ -164,7 +164,7 @@ class AppRunnerTest {
         appRunner.setAdminEmail(email);
         appRunner.setAdminPassword(equalPassword);
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findByNormalizedUsername(username)).thenReturn(Optional.empty());
 
         appRunner.run(new DefaultApplicationArguments());
 
@@ -189,7 +189,7 @@ class AppRunnerTest {
         appRunner.setAdminEmail(email);
         appRunner.setAdminPassword(shortPassword);
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findByNormalizedUsername(username)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> appRunner.run(new DefaultApplicationArguments()))
             .isInstanceOf(IllegalStateException.class)
@@ -215,7 +215,7 @@ class AppRunnerTest {
         appRunner.setAdminEmail(email);
         appRunner.setAdminPassword(equalPassword);
 
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findByNormalizedUsername(username)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> appRunner.run(new DefaultApplicationArguments()))
             .isInstanceOf(IllegalStateException.class)
@@ -237,7 +237,7 @@ class AppRunnerTest {
 
         appRunner.run(new DefaultApplicationArguments());
 
-        verify(userRepository, never()).findByUsername(anyString());
+        verify(userRepository, never()).findByNormalizedUsername(anyString());
         verify(userRepository, never()).save(any(User.class));
 
         assertThat(listAppender.list)
@@ -252,7 +252,7 @@ class AppRunnerTest {
 
         appRunner.run(new DefaultApplicationArguments());
 
-        verify(userRepository, never()).findByUsername(anyString());
+        verify(userRepository, never()).findByNormalizedUsername(anyString());
         verify(userRepository, never()).save(any(User.class));
 
         assertThat(listAppender.list)

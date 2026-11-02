@@ -188,4 +188,33 @@ class ProfileSecurityDefaultsTest {
         assertThat(starrocksService.getAvailableMeters()).isEmpty();
         assertThat(starrocksService.getConsumerActualDemandMap(java.util.List.of("2026-06-01"), "M123")).isEmpty();
     }
+
+    @Test
+    @DisplayName("SEC-12: Verify Redis defaults and profile-specific overrides")
+    void testRedisProfileConfigurations() throws Exception {
+        java.util.Properties defaultProps = new java.util.Properties();
+        try (var is = getClass().getResourceAsStream("/application.properties")) {
+            defaultProps.load(is);
+        }
+        assertThat(defaultProps.getProperty("app.auth.otp.allow-memory-fallback"))
+            .isEqualTo("${OTP_ALLOW_MEMORY_FALLBACK:true}");
+        assertThat(defaultProps.getProperty("management.health.redis.enabled"))
+            .isEqualTo("${MANAGEMENT_HEALTH_REDIS_ENABLED:false}");
+        assertThat(defaultProps.getProperty("spring.data.redis.url"))
+            .isEqualTo("${REDIS_URL:redis://localhost:6379}");
+
+        java.util.Properties prodProps = new java.util.Properties();
+        try (var is = getClass().getResourceAsStream("/application-prod.properties")) {
+            prodProps.load(is);
+        }
+        assertThat(prodProps.getProperty("app.auth.otp.allow-memory-fallback")).isEqualTo("false");
+        assertThat(prodProps.getProperty("management.health.redis.enabled")).isEqualTo("true");
+
+        java.util.Properties stagingProps = new java.util.Properties();
+        try (var is = getClass().getResourceAsStream("/application-staging.properties")) {
+            stagingProps.load(is);
+        }
+        assertThat(stagingProps.getProperty("app.auth.otp.allow-memory-fallback")).isEqualTo("true");
+        assertThat(stagingProps.getProperty("management.health.redis.enabled")).isEqualTo("true");
+    }
 }

@@ -17,7 +17,7 @@ public class ExchangeDamRate implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
-    private Integer id;
+    private Long id;
 
     @Column(name = "date")
     private LocalDate date;
@@ -50,7 +50,7 @@ public class ExchangeDamRate implements Serializable {
         return new ExchangeDamRate();
     }
 
-    public ExchangeDamRate(Integer id, LocalDate date, LocalTime intervalTime, BigDecimal mcp, BigDecimal mcv) {
+    public ExchangeDamRate(Long id, LocalDate date, LocalTime intervalTime, BigDecimal mcp, BigDecimal mcv) {
         this.id = id;
         this.date = date;
         this.intervalTime = intervalTime;
@@ -58,11 +58,11 @@ public class ExchangeDamRate implements Serializable {
         this.mcv = mcv;
     }
 
-    public Integer getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

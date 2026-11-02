@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ExchangeDamRateRepository extends JpaRepository<ExchangeDamRate, String>, JpaSpecificationExecutor<ExchangeDamRate> {
+public interface ExchangeDamRateRepository extends JpaRepository<ExchangeDamRate, Long>, JpaSpecificationExecutor<ExchangeDamRate> {
 }

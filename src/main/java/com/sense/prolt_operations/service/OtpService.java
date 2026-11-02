@@ -86,14 +86,14 @@ public class OtpService {
         if (email == null || email.isBlank()) {
             throw new BadRequestException("Email is required");
         }
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(java.util.Locale.ROOT);
 
         // Check if user exists
-        userRepository.findByEmail(normalizedEmail)
+        userRepository.findByNormalizedEmail(normalizedEmail)
                 .orElseThrow(() -> new NotFoundException("User with this email not found"));
 
         // PARITY: Superadmin fixed OTP bypass from Node backend (backend/src/modules/auth/otp.service.ts:L24-L28).
-        if (superadminBypassEnabled && superadminEmail != null && superadminEmail.equalsIgnoreCase(normalizedEmail)) {
+        if (superadminBypassEnabled && superadminEmail != null && superadminEmail.trim().equalsIgnoreCase(normalizedEmail)) {
             log.info("[DEV MODE] Superadmin login requested. Use fixed OTP.");
             return;
         }
@@ -136,10 +136,15 @@ public class OtpService {
                 mailSender.send(message);
                 log.info("OTP email sent successfully to {}", normalizedEmail);
             } catch (Exception e) {
-                log.error("Failed to send OTP email to {}: {}", normalizedEmail, e.getMessage());
+                log.error("Failed to send OTP email", e);
+                throw new AppBaseException("Something went very wrong!", HttpStatus.INTERNAL_SERVER_ERROR);
             }
         } else {
-            log.info("[DEV MODE] Generated OTP for {}: {}", normalizedEmail, otp);
+            if (allowMemoryFallback) {
+                log.info("[DEV MODE] Generated OTP for {}: {}", normalizedEmail, otp);
+            } else {
+                log.info("OTP generated but no mail transport is configured");
+            }
         }
     }
 
@@ -147,11 +152,12 @@ public class OtpService {
         if (email == null || enteredOtp == null) {
             return false;
         }
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(java.util.Locale.ROOT);
+        String trimmedOtp = enteredOtp.trim();
 
         // PARITY: Superadmin fixed OTP backdoor from Node backend (backend/src/modules/auth/otp.service.ts:L20-L21, L106-L109).
-        if (superadminBypassEnabled && superadminEmail != null && superadminEmail.equalsIgnoreCase(normalizedEmail)) {
-            return superadminFixedOtp != null && superadminFixedOtp.equals(enteredOtp.trim());
+        if (superadminBypassEnabled && superadminEmail != null && superadminEmail.trim().equalsIgnoreCase(normalizedEmail)) {
+            return superadminFixedOtp != null && superadminFixedOtp.equals(trimmedOtp);
         }
 
         // In prod without memory fallback: must verify via Redis
@@ -162,7 +168,7 @@ public class OtpService {
             }
             try {
                 String redisOtp = redisTemplate.opsForValue().get("otp:" + normalizedEmail);
-                if (redisOtp != null && redisOtp.equals(enteredOtp.trim())) {
+                if (redisOtp != null && redisOtp.equals(trimmedOtp)) {
                     redisTemplate.delete("otp:" + normalizedEmail);
                     return true;
                 }
@@ -180,7 +186,7 @@ public class OtpService {
                 inMemoryStore.remove(normalizedEmail);
                 return false;
             }
-            if (stored.otp().equals(enteredOtp.trim())) {
+            if (stored.otp().equals(trimmedOtp)) {
                 inMemoryStore.remove(normalizedEmail);
                 if (redisTemplate != null) {
                     try {
@@ -195,7 +201,7 @@ public class OtpService {
         if (redisTemplate != null) {
             try {
                 String redisOtp = redisTemplate.opsForValue().get("otp:" + normalizedEmail);
-                if (redisOtp != null && redisOtp.equals(enteredOtp.trim())) {
+                if (redisOtp != null && redisOtp.equals(trimmedOtp)) {
                     redisTemplate.delete("otp:" + normalizedEmail);
                     return true;
                 }

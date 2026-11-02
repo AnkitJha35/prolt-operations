@@ -20,7 +20,6 @@
 		<pdfbox.version>3.0.3</pdfbox.version>
 		<playwright.version>1.49.0</playwright.version>
 		<commons-csv.version>1.12.0</commons-csv.version>
-		<shedlock.version>5.16.0</shedlock.version>
 		<jfreechart.version>1.5.5</jfreechart.version>
 	</properties>
 
@@ -142,18 +141,6 @@
 			<groupId>org.jfree</groupId>
 			<artifactId>jfreechart</artifactId>
 			<version>${jfreechart.version}</version>
-		</dependency>
-
-		<!-- Schedulers -->
-		<dependency>
-			<groupId>net.javacrumbs.shedlock</groupId>
-			<artifactId>shedlock-spring</artifactId>
-			<version>${shedlock.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>net.javacrumbs.shedlock</groupId>
-			<artifactId>shedlock-provider-redis-spring</artifactId>
-			<version>${shedlock.version}</version>
 		</dependency>
 
 		<!-- Test Dependencies -->

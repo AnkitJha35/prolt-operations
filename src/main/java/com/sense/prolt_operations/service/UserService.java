@@ -8,9 +8,11 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,21 +61,32 @@ public class UserService {
         return userAuditLogRepository.findAllByOrderByTimestampDesc();
     }
 
+    private String normalizeEmail(String email) {
+        return (email != null) ? email.trim().toLowerCase(java.util.Locale.ROOT) : null;
+    }
+
     public UserDTO createUser(CreateUserDTO dto, String performedBy) {
-        if (dto == null || dto.username() == null || dto.username().isBlank()) {
+        if (dto == null || !StringUtils.hasText(dto.username())) {
             throw new BadRequestException("Username is required");
         }
-        if (dto.email() == null || dto.email().isBlank()) {
+        if (!StringUtils.hasText(dto.email())) {
             throw new BadRequestException("Email is required");
+        }
+        if (!StringUtils.hasText(dto.fullName())) {
+            throw new BadRequestException("Full name is required");
+        }
+        if (dto.fullName().trim().length() > 100) {
+            throw new BadRequestException("Full name must not exceed 100 characters");
         }
         if (dto.role() == null || (!dto.role().equalsIgnoreCase("ADMIN") && !dto.role().equalsIgnoreCase("CLIENT"))) {
             throw new BadRequestException("Valid role is required (ADMIN or CLIENT)");
         }
 
         String username = dto.username().trim();
-        String email = dto.email().trim();
+        String email = normalizeEmail(dto.email());
+        String fullName = dto.fullName().trim();
 
-        if (userRepository.existsByUsername(username) || userRepository.existsByEmail(email)) {
+        if (userRepository.existsByNormalizedUsername(username) || userRepository.existsByNormalizedEmail(email)) {
             throw new BadRequestException("Username or email already exists");
         }
 
@@ -85,17 +98,24 @@ public class UserService {
         User user = User.create();
         user.setUsername(username);
         user.setEmail(email);
+        user.setFullName(fullName);
         user.setPasswordHash(passwordHash);
-        user.setRole(Role.valueOf(dto.role().toUpperCase()));
+        user.setRole(Role.valueOf(dto.role().toUpperCase(java.util.Locale.ROOT)));
         user.setHiddenModulesList(dto.hiddenModules() != null ? dto.hiddenModules() : Collections.emptyList());
         user.setReadOnlyModulesList(dto.readOnlyModules() != null ? dto.readOnlyModules() : Collections.emptyList());
 
-        user = userRepository.save(user);
+        try {
+            user = userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Database unique constraint violation during user creation for username '{}' or email '{}': {}", username, email, e.getMessage());
+            throw new BadRequestException("Username or email already exists");
+        }
 
         // Audit log
         Map<String, Object> changes = new HashMap<>();
         changes.put("username", user.getUsername());
         changes.put("email", user.getEmail());
+        changes.put("fullName", user.getFullName());
         changes.put("role", user.getRole().name());
         changes.put("hiddenModules", user.getHiddenModulesList());
         changes.put("readOnlyModules", user.getReadOnlyModulesList());
@@ -110,14 +130,17 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        if (dto.username() != null) {
-            if (dto.username().isBlank()) {
-                throw new BadRequestException("Username must be a valid string");
-            }
-        }
         if (dto.email() != null) {
             if (dto.email().isBlank()) {
                 throw new BadRequestException("Email must be a valid string");
+            }
+        }
+        if (dto.fullName() != null) {
+            if (dto.fullName().isBlank()) {
+                throw new BadRequestException("Full name must be a valid string");
+            }
+            if (dto.fullName().trim().length() > 100) {
+                throw new BadRequestException("Full name must not exceed 100 characters");
             }
         }
         if (dto.role() != null) {
@@ -128,17 +151,26 @@ public class UserService {
 
         Map<String, Object> changes = new HashMap<>();
 
-        if (dto.username() != null && !dto.username().trim().equals(user.getUsername())) {
-            changes.put("username", Map.of("old", user.getUsername(), "new", dto.username().trim()));
-            user.setUsername(dto.username().trim());
+        if (dto.email() != null) {
+            String normalizedNewEmail = normalizeEmail(dto.email());
+            if (!normalizedNewEmail.equalsIgnoreCase(user.getEmail())) {
+                if (userRepository.existsByNormalizedEmailAndIdNot(normalizedNewEmail, user.getId())) {
+                    throw new BadRequestException("Username or email already exists");
+                }
+                changes.put("email", Map.of("old", user.getEmail() != null ? user.getEmail() : "", "new", normalizedNewEmail));
+                user.setEmail(normalizedNewEmail);
+            }
         }
-        if (dto.email() != null && !dto.email().trim().equals(user.getEmail())) {
-            changes.put("email", Map.of("old", user.getEmail(), "new", dto.email().trim()));
-            user.setEmail(dto.email().trim());
+        if (dto.fullName() != null) {
+            String trimmedFullName = dto.fullName().trim();
+            if (!trimmedFullName.equals(user.getFullName())) {
+                changes.put("fullName", Map.of("old", user.getFullName() != null ? user.getFullName() : "", "new", trimmedFullName));
+                user.setFullName(trimmedFullName);
+            }
         }
         if (dto.role() != null && !dto.role().equalsIgnoreCase(user.getRole().name())) {
-            changes.put("role", Map.of("old", user.getRole().name(), "new", dto.role().toUpperCase()));
-            user.setRole(Role.valueOf(dto.role().toUpperCase()));
+            changes.put("role", Map.of("old", user.getRole().name(), "new", dto.role().toUpperCase(java.util.Locale.ROOT)));
+            user.setRole(Role.valueOf(dto.role().toUpperCase(java.util.Locale.ROOT)));
         }
         if (dto.hiddenModules() != null) {
             changes.put("hiddenModules", Map.of("old", user.getHiddenModulesList(), "new", dto.hiddenModules()));
@@ -153,7 +185,12 @@ public class UserService {
             user.setPasswordHash(passwordEncoder.encode(dto.password().trim()));
         }
 
-        user = userRepository.save(user);
+        try {
+            user = userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Database unique constraint violation during user update for user '{}': {}", id, e.getMessage());
+            throw new BadRequestException("Username or email already exists");
+        }
 
         if (!changes.isEmpty()) {
             createAuditLog("UPDATE", user.getId(), user.getUsername(), performedBy, changes);
@@ -195,6 +232,7 @@ public class UserService {
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.getFullName(),
                 user.getRole() != null ? user.getRole().name() : null,
                 user.getHiddenModulesList(),
                 user.getReadOnlyModulesList(),

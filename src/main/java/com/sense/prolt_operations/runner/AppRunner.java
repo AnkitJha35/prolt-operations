@@ -68,7 +68,11 @@ public class AppRunner implements ApplicationRunner {
             return;
         }
 
-        if (userRepository.findByUsername(adminUsername).isPresent()) {
+        String normalizedUsername = adminUsername.trim();
+        String normalizedEmail = adminEmail.trim().toLowerCase(java.util.Locale.ROOT);
+
+        if (userRepository.findByNormalizedUsername(normalizedUsername).isPresent()
+                || userRepository.findByNormalizedEmail(normalizedEmail).isPresent()) {
             log.info("Admin user already exists, skipping: {}", adminUsername);
             return;
         }
@@ -82,8 +86,9 @@ public class AppRunner implements ApplicationRunner {
         }
 
         User user = User.create();
-        user.setUsername(adminUsername);
-        user.setEmail(adminEmail);
+        user.setUsername(normalizedUsername);
+        user.setEmail(normalizedEmail);
+        user.setFullName("System Administrator");
         user.setPasswordHash(passwordEncoder.encode(adminPassword));
         user.setRole(Role.ADMIN);
         userRepository.save(user);

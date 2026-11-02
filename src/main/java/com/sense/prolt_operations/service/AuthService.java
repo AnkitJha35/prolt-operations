@@ -53,8 +53,8 @@ public class AuthService {
         String username = dto.effectiveUsername().trim();
         String password = dto.password().trim();
 
-        User user = userRepository.findByUsername(username)
-                .or(() -> userRepository.findByEmail(username))
+        User user = userRepository.findByNormalizedUsername(username)
+                .or(() -> userRepository.findByNormalizedEmail(username))
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
@@ -70,8 +70,9 @@ public class AuthService {
         if (dto == null || dto.email() == null || dto.email().isBlank()) {
             throw new BadRequestException("Email is required");
         }
-        otpService.generateAndSendOtp(dto.email().trim());
-        log.info("OTP sent successfully to {}", dto.email());
+        String normalizedEmail = dto.email().trim().toLowerCase(java.util.Locale.ROOT);
+        otpService.generateAndSendOtp(normalizedEmail);
+        log.info("OTP sent successfully to {}", normalizedEmail);
         return new SuccessResponse(true, "OTP sent successfully");
     }
 
@@ -80,7 +81,7 @@ public class AuthService {
             throw new BadRequestException("Email and OTP are required");
         }
 
-        String email = dto.email().trim();
+        String email = dto.email().trim().toLowerCase(java.util.Locale.ROOT);
         String otp = dto.otp().trim();
 
         boolean isValid = otpService.verifyOtp(email, otp);
@@ -88,8 +89,7 @@ public class AuthService {
             throw new UnauthorizedException("Invalid or expired OTP");
         }
 
-        User user = userRepository.findByEmail(email)
-                .or(() -> userRepository.findByEmail(email.toLowerCase()))
+        User user = userRepository.findByNormalizedEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
         String token = jwtService.generateToken(user);
@@ -107,14 +107,13 @@ public class AuthService {
         Map<String, Object> userData = new HashMap<>();
         userData.put("id", principal.getId());
         userData.put("username", principal.getUsername());
-        userData.put("email", principal.getEmail());
-        userData.put("name", principal.getUsername());
         userData.put("role", principal.getRole());
         userData.put("hiddenModules", principal.getHiddenModules());
         userData.put("readOnlyModules", principal.getReadOnlyModules());
+        userData.put("iat", principal.getIssuedAt());
+        userData.put("exp", principal.getExpiresAt());
 
         response.put("user", userData);
-        response.put("data", userData);
         return response;
     }
 
@@ -123,6 +122,7 @@ public class AuthService {
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.getFullName(),
                 user.getRole() != null ? user.getRole().name() : null,
                 user.getHiddenModulesList(),
                 user.getReadOnlyModulesList()

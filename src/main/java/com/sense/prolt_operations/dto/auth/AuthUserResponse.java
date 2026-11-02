@@ -7,12 +7,17 @@ public record AuthUserResponse(
     String id,
     String username,
     String email,
+    String fullName,
     String role,
     List<String> hiddenModules,
     List<String> readOnlyModules
 ) {
+    public AuthUserResponse(String id, String username, String email, String role, List<String> hiddenModules, List<String> readOnlyModules) {
+        this(id, username, email, null, role, hiddenModules, readOnlyModules);
+    }
+
     @JsonProperty("name")
     public String name() {
-        return username;
+        return (fullName != null && !fullName.isBlank()) ? fullName : username;
     }
 }

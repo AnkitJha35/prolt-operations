@@ -182,8 +182,9 @@ public class DatabaseController {
     @PostMapping("/city-state")
     @Operation(summary = "Create City State Entry", description = "Creates a city state entry")
     public ResponseEntity<Map<String, Object>> createCityStateData(@RequestBody Map<String, Object> body) {
-        if (!body.containsKey("cityName") || !body.containsKey("stateName") ||
-            !body.containsKey("population") || !body.containsKey("latitude") || !body.containsKey("longitude")) {
+        if (body.get("cityName") == null || body.get("cityName").toString().isEmpty() ||
+            body.get("stateName") == null || body.get("stateName").toString().isEmpty() ||
+            body.get("population") == null || body.get("latitude") == null || body.get("longitude") == null) {
             throw new BadRequestException("Missing required fields");
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(

@@ -153,6 +153,39 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("PARITY-04A: Resource Center bulk request boundary behavior")
+    void testResourceCenterBulkRequestBoundaries() throws Exception {
+        // Node accepts an empty array and reports that zero records were uploaded.
+        mockMvc.perform(post("/api/resource-center/region-state/bulk")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Bulk uploaded 0 records successfully"))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        // Blank rows are filtered before the bulk operation, just as in Node.
+        mockMvc.perform(post("/api/resource-center/region-state/bulk")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[{\"stateName\":\"   \"}, {}]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").value("Bulk uploaded 0 records successfully"));
+
+        mockMvc.perform(post("/api/resource-center/region-state/bulk")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Payload must be an array of records"));
+
+        mockMvc.perform(post("/api/resource-center/not-a-resource/bulk")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Unsupported resource type"));
+    }
+
+    @Test
     @DisplayName("PARITY-05: Database Demand, Holidays, and City State Registry")
     void testDatabaseSubsystem() throws Exception {
         // GET demand
@@ -182,6 +215,37 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
                 .content(objectMapper.writeValueAsString(cityState)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("PARITY-05A: City State Registry input and duplicate behavior")
+    void testCityStateInputAndDuplicateBehavior() throws Exception {
+        String payload = """
+                {"cityName":"  Parity City  ","stateName":"  Parity State  ",
+                 "population":"12345","latitude":"12.345","longitude":"67.89"}
+                """;
+
+        mockMvc.perform(post("/api/database/city-state")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.cityName").value("Parity City"))
+                .andExpect(jsonPath("$.data.stateName").value("Parity State"))
+                .andExpect(jsonPath("$.data.population").value(12345));
+
+        mockMvc.perform(post("/api/database/city-state")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("City and State entry already exists."));
+
+        mockMvc.perform(post("/api/database/city-state")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cityName\":null,\"stateName\":\"State\",\"population\":0,\"latitude\":0,\"longitude\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Missing required fields"));
     }
 
     @Test

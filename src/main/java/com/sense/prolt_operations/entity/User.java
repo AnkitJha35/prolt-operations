@@ -16,11 +16,14 @@ public class User implements Serializable {
     @Column(name = "id")
     private String id;
 
-    @Column(name = "username")
+    @Column(name = "username", nullable = false, unique = true, updatable = false)
     private String username;
 
     @Column(name = "email")
     private String email;
+
+    @Column(name = "fullName", length = 100)
+    private String fullName;
 
     @Column(name = "passwordHash")
     private String passwordHash;
@@ -73,9 +76,14 @@ public class User implements Serializable {
     }
 
     public User(String id, String username, String email, String passwordHash, Role role) {
+        this(id, username, email, null, passwordHash, role);
+    }
+
+    public User(String id, String username, String email, String fullName, String passwordHash, Role role) {
         this.id = id;
         this.username = username;
         this.email = email;
+        this.fullName = fullName;
         this.passwordHash = passwordHash;
         this.role = role;
     }
@@ -102,6 +110,14 @@ public class User implements Serializable {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
     }
 
     public String getPasswordHash() {
@@ -183,6 +199,6 @@ public class User implements Serializable {
 
     @Override
     public String toString() {
-        return "User{" + "id=" + id + ", " + "username=" + username + ", " + "email=" + email + ", " + "passwordHash=" + passwordHash + ", " + "createdAt=" + createdAt + ", " + "updatedAt=" + updatedAt + "}";
+        return "User{" + "id=" + id + ", " + "username=" + username + ", " + "email=" + email + ", " + "fullName=" + fullName + ", " + "passwordHash=" + passwordHash + ", " + "createdAt=" + createdAt + ", " + "updatedAt=" + updatedAt + "}";
     }
 }
