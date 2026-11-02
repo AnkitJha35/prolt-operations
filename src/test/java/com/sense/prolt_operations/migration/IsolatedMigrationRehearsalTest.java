@@ -185,9 +185,9 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                     .load();
 
             int executed = flyway.migrate().migrationsExecuted;
-            assertThat(executed).isEqualTo(8);
+            assertThat(executed).isEqualTo(10);
 
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
             assertThat(flyway.info().current().getState().isApplied()).isTrue();
 
             // Verify all 58 canonical tables exist
@@ -288,9 +288,9 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                     .load();
 
             int executed = flyway.migrate().migrationsExecuted;
-            assertThat(executed).isEqualTo(3); // V6, V7, and V8 applied cleanly
+            assertThat(executed).isEqualTo(5); // V6, V7, V8, V9, and V10 applied cleanly
 
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
             assertThat(flyway.info().current().getState().isApplied()).isTrue();
 
             // Verify dsm_charges is now created and total tables is 58
@@ -356,12 +356,12 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                     .load();
 
             flyway.migrate();
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
 
             // Sub-test A: Second migrate() invocation is an absolute no-op
             int secondRun = flyway.migrate().migrationsExecuted;
             assertThat(secondRun).isZero();
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
 
             // Sub-test B: Raw DDL replay (CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS) is completely safe
             executeSql(dbUrl, """

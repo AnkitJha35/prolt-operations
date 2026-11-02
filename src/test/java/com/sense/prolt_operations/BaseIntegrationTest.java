@@ -41,6 +41,7 @@ public abstract class BaseIntegrationTest {
         registry.add("app.webhook-secret", () -> "test_webhook_secret_key");
         registry.add("spring.data.redis.url", () -> "redis://localhost:6379");
         registry.add("app.redis-url", () -> "redis://localhost:6379");
+        registry.add("spring.flyway.target", () -> "8");
         registry.add("management.endpoints.web.exposure.include", () -> "health,info,prometheus");
         registry.add("management.prometheus.metrics.export.enabled", () -> "true");
     }

@@ -76,9 +76,11 @@ public class TestUserHelper {
             User u = User.create();
             u.setUsername("superadmin");
             u.setEmail(email);
+            u.setFullName("System Administrator");
             return u;
         });
         user.setRole(Role.SUPER_ADMIN);
+        user.setFullName("System Administrator");
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user = userRepository.save(user);
         String token = jwtService.generateToken(user);

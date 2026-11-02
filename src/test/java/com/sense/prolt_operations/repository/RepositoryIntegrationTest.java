@@ -88,6 +88,7 @@ public class RepositoryIntegrationTest extends BaseIntegrationTest {
         user.setEmail(testUsername + "@probus.io");
         user.setPasswordHash(passwordEncoder.encode("TestCrudUserPass123!"));
         user.setRole(Role.CLIENT);
+        user.setFullName("Test CRUD User");
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 

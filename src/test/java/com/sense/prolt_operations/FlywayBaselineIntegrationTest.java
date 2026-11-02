@@ -39,10 +39,10 @@ class FlywayBaselineIntegrationTest extends BaseIntegrationTest {
                     .load();
 
             int applied = flyway.migrate().migrationsExecuted;
-            assertThat(applied).isEqualTo(8);
+            assertThat(applied).isEqualTo(10);
 
             assertThat(flyway.info().current()).isNotNull();
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
             assertThat(flyway.info().current().getState().isApplied()).isTrue();
 
             // Verify User table is created and contains zero rows
@@ -58,7 +58,7 @@ class FlywayBaselineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("Case B: Baseline an existing database at version 5 preserves existing data and applies V6, V7, V8")
+    @DisplayName("Case B: Baseline an existing database at version 5 preserves existing data and applies V6 through V10")
     void baselineExistingDatabase_preservesDataAndSetsBaselineRow() throws Exception {
         String existingDbName = "existing_test_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         executeSqlOnDatabase(postgres.getJdbcUrl(), "CREATE DATABASE \"" + existingDbName + "\"");
@@ -97,11 +97,11 @@ class FlywayBaselineIntegrationTest extends BaseIntegrationTest {
                     .load();
 
             int executedMigrations = baselineFlyway.migrate().migrationsExecuted;
-            // Migrations V6, V7, and V8 are executed because schema is baselined at version 5 and V6..V8 are pending
-            assertThat(executedMigrations).isEqualTo(3);
-            assertThat(baselineFlyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            // Migrations V6, V7, V8, V9, and V10 are executed because schema is baselined at version 5 and V6..V10 are pending
+            assertThat(executedMigrations).isEqualTo(5);
+            assertThat(baselineFlyway.info().current().getVersion().getVersion()).isEqualTo("10");
 
-            // Step 4: Verify flyway_schema_history has the baseline row at version 5 and migration rows at 6, 7, 8
+            // Step 4: Verify flyway_schema_history has the baseline row at version 5 and migration rows at 6, 7, 8, 9, 10
             try (Connection conn = DriverManager.getConnection(existingDbUrl, postgres.getUsername(), postgres.getPassword());
                  Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("""
@@ -150,6 +150,32 @@ class FlywayBaselineIntegrationTest extends BaseIntegrationTest {
                      """)) {
                 assertThat(rs.next()).isTrue();
                 assertThat(rs.getString("version")).isEqualTo("8");
+                assertThat(rs.getString("type")).isEqualTo("SQL");
+                assertThat(rs.getBoolean("success")).isTrue();
+            }
+
+            try (Connection conn = DriverManager.getConnection(existingDbUrl, postgres.getUsername(), postgres.getPassword());
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("""
+                     SELECT "version", "type", "success"
+                     FROM "public"."flyway_schema_history"
+                     WHERE "version" = '9'
+                     """)) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("version")).isEqualTo("9");
+                assertThat(rs.getString("type")).isEqualTo("SQL");
+                assertThat(rs.getBoolean("success")).isTrue();
+            }
+
+            try (Connection conn = DriverManager.getConnection(existingDbUrl, postgres.getUsername(), postgres.getPassword());
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("""
+                     SELECT "version", "type", "success"
+                     FROM "public"."flyway_schema_history"
+                     WHERE "version" = '10'
+                     """)) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getString("version")).isEqualTo("10");
                 assertThat(rs.getString("type")).isEqualTo("SQL");
                 assertThat(rs.getBoolean("success")).isTrue();
             }
