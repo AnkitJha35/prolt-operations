@@ -98,7 +98,7 @@ public class SecurityConfig {
                 // Protected business modules (exact parity with Node)
                 .requestMatchers("/api/datasets/**").authenticated()
                 .requestMatchers("/api/upload-history/**").authenticated()
-                .requestMatchers("/api/landing-price-calc/**").authenticated()
+                .requestMatchers("/api/landing-price-calc/**", "/api/landing-price-calculator/**").authenticated()
                 .requestMatchers("/api/savings-calculator/**", "/api/savings-calculator-new/**").authenticated()
                 .requestMatchers("/api/uploads/**").authenticated()
                 .requestMatchers("/api/auth/me", "/api/auth/sessions", "/api/auth/sessions/**").authenticated()
