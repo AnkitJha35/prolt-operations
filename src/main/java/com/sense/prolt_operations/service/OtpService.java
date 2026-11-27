@@ -17,9 +17,11 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import com.sense.prolt_operations.entity.User;
 import com.sense.prolt_operations.exception.AppBaseException;
 import com.sense.prolt_operations.exception.BadRequestException;
 import com.sense.prolt_operations.exception.NotFoundException;
+import com.sense.prolt_operations.exception.UnauthorizedException;
 import com.sense.prolt_operations.repository.UserRepository;
 
 import jakarta.mail.internet.MimeMessage;
@@ -89,8 +91,12 @@ public class OtpService {
         String normalizedEmail = email.trim().toLowerCase(java.util.Locale.ROOT);
 
         // Check if user exists
-        userRepository.findByNormalizedEmail(normalizedEmail)
+        User user = userRepository.findByNormalizedEmail(normalizedEmail)
                 .orElseThrow(() -> new NotFoundException("User with this email not found"));
+
+        if (!user.isEnabled()) {
+            throw new UnauthorizedException("Account is disabled. Please contact administrator.");
+        }
 
         // PARITY: Superadmin fixed OTP bypass from Node backend (backend/src/modules/auth/otp.service.ts:L24-L28).
         if (superadminBypassEnabled && superadminEmail != null && superadminEmail.trim().equalsIgnoreCase(normalizedEmail)) {

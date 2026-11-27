@@ -40,5 +40,20 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE LOWER(TRIM(u.email)) = LOWER(TRIM(:email))")
     boolean existsByEmail(@Param("email") String email);
 
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role AND u.enabled = true")
+    long countByRoleAndEnabledTrue(@Param("role") com.sense.prolt_operations.entity.Role role);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.enabled = true ORDER BY u.id")
+    java.util.List<User> findActiveUsersByRoleForUpdate(@Param("role") com.sense.prolt_operations.entity.Role role);
+
+    @Query("SELECT new com.sense.prolt_operations.repository.UserSecurityState(u.id, u.username, u.role, u.enabled, u.tokenVersion) FROM User u WHERE u.id = :id")
+    Optional<UserSecurityState> findSecurityStateById(@Param("id") String id);
+
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE User u SET u.tokenVersion = u.tokenVersion + 1 WHERE u.id = :id")
+    int incrementTokenVersion(@Param("id") String id);
+
     java.util.List<User> findAllByOrderByCreatedAtDesc();
 }

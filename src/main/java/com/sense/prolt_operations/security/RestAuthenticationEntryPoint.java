@@ -17,6 +17,11 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
                          AuthenticationException authException) throws IOException {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        String customMsg = (String) request.getAttribute("auth_error_message");
+        if (customMsg != null && !customMsg.isBlank()) {
+            response.getWriter().write("{\"success\":false,\"message\":\"" + customMsg + "\"}");
+            return;
+        }
         response.getWriter().write("{\"success\":false,\"message\":\"Unauthorized\"}");
     }
 }

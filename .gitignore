@@ -36,3 +36,14 @@ logs/
 .env
 .env.*
 !.env.staging.example
+src/main/resources/application-local.properties
+application-local.properties
+src/main/resources/application-localvalidate.properties
+application-localvalidate.properties
+src/main/resources/application-dev.properties
+application-dev.properties
+
+# Database backups
+backups/
+*.dump
+*.sql.gz

@@ -5,15 +5,13 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-
 import com.sense.prolt_operations.dto.auth.AuthResponse;
 import com.sense.prolt_operations.dto.auth.AuthUserResponse;
-import com.sense.prolt_operations.dto.auth.LoginDTO;
 import com.sense.prolt_operations.dto.auth.SendOtpDTO;
 import com.sense.prolt_operations.dto.auth.SuccessResponse;
 import com.sense.prolt_operations.dto.auth.VerifyOtpDTO;
+import com.sense.prolt_operations.dto.response.UserMeData;
+import com.sense.prolt_operations.dto.response.UserMeResponse;
 import com.sense.prolt_operations.entity.User;
 import com.sense.prolt_operations.exception.BadRequestException;
 import com.sense.prolt_operations.exception.NotFoundException;
@@ -21,6 +19,7 @@ import com.sense.prolt_operations.exception.UnauthorizedException;
 import com.sense.prolt_operations.repository.UserRepository;
 import com.sense.prolt_operations.security.JwtService;
 import com.sense.prolt_operations.security.ProltUserPrincipal;
+import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
@@ -28,42 +27,18 @@ public class AuthService {
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final OtpService otpService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       OtpService otpService) {
+                       OtpService otpService,
+                       RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.otpService = otpService;
-    }
-
-    public AuthResponse login(LoginDTO dto) {
-        if (dto == null || dto.effectiveUsername() == null || dto.effectiveUsername().isBlank()) {
-            throw new BadRequestException("Username is required");
-        }
-        if (dto.password() == null || dto.password().isBlank()) {
-            throw new BadRequestException("Password is required");
-        }
-
-        String username = dto.effectiveUsername().trim();
-        String password = dto.password().trim();
-
-        User user = userRepository.findByNormalizedUsername(username)
-                .or(() -> userRepository.findByNormalizedEmail(username))
-                .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
-
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new UnauthorizedException("Invalid credentials");
-        }
-
-        String token = jwtService.generateToken(user);
-        log.info("User login successful: {}", user.getUsername());
-        return new AuthResponse(true, token, toAuthUserResponse(user));
+        this.refreshTokenService = refreshTokenService;
     }
 
     public SuccessResponse sendOtp(SendOtpDTO dto) {
@@ -77,6 +52,10 @@ public class AuthService {
     }
 
     public AuthResponse verifyOtp(VerifyOtpDTO dto) {
+        return verifyOtp(dto, "127.0.0.1", "UNKNOWN").authResponse();
+    }
+
+    public com.sense.prolt_operations.dto.auth.RefreshResult verifyOtp(VerifyOtpDTO dto, String ip, String userAgent) {
         if (dto == null || dto.email() == null || dto.email().isBlank() || dto.otp() == null || dto.otp().isBlank()) {
             throw new BadRequestException("Email and OTP are required");
         }
@@ -92,29 +71,59 @@ public class AuthService {
         User user = userRepository.findByNormalizedEmail(email)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        String token = jwtService.generateToken(user);
+        if (!user.isEnabled()) {
+            throw new UnauthorizedException("Account is disabled. Please contact administrator.");
+        }
+
         log.info("User OTP login successful: {}", email);
-        return new AuthResponse(true, token, toAuthUserResponse(user));
+        return refreshTokenService.createSession(user, ip, userAgent);
     }
 
-    public Map<String, Object> getMe(ProltUserPrincipal principal) {
+    public com.sense.prolt_operations.dto.auth.RefreshResult refresh(String rawRefreshToken, String ip, String userAgent) {
+        return refreshTokenService.rotateSession(rawRefreshToken, ip, userAgent);
+    }
+
+    public org.springframework.http.ResponseCookie logout(String rawRefreshToken) {
+        return refreshTokenService.logout(rawRefreshToken);
+    }
+
+    public java.util.List<com.sense.prolt_operations.dto.auth.UserSessionDTO> getSessions(String userId, String currentRawToken) {
+        return refreshTokenService.getUserSessions(userId, currentRawToken);
+    }
+
+    public void revokeSession(String userId, String sessionId) {
+        refreshTokenService.revokeUserSession(userId, sessionId);
+    }
+
+    public String getRefreshTokenCookieName() {
+        return refreshTokenService.getCookieName();
+    }
+
+    public UserMeResponse getMe(ProltUserPrincipal principal) {
         if (principal == null) {
             throw new UnauthorizedException("Unauthorized");
         }
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
 
-        Map<String, Object> userData = new HashMap<>();
-        userData.put("id", principal.getId());
-        userData.put("username", principal.getUsername());
-        userData.put("role", principal.getRole());
-        userData.put("hiddenModules", principal.getHiddenModules());
-        userData.put("readOnlyModules", principal.getReadOnlyModules());
-        userData.put("iat", principal.getIssuedAt());
-        userData.put("exp", principal.getExpiresAt());
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
 
-        response.put("user", userData);
-        return response;
+        if (!user.isEnabled()) {
+            throw new UnauthorizedException("Account is disabled. Please contact administrator.");
+        }
+
+        UserMeData userData = new UserMeData(
+                user.getId(),
+                user.getUsername(),
+                user.getFullName(),
+                user.getRole() != null ? user.getRole().name() : principal.getRole(),
+                user.isEnabled(),
+                user.getHiddenModulesList(),
+                user.getReadOnlyModulesList(),
+                principal.getIssuedAt(),
+                principal.getExpiresAt()
+        );
+
+        return UserMeResponse.of(userData);
     }
 
     private AuthUserResponse toAuthUserResponse(User user) {
@@ -124,6 +133,7 @@ public class AuthService {
                 user.getEmail(),
                 user.getFullName(),
                 user.getRole() != null ? user.getRole().name() : null,
+                user.isEnabled(),
                 user.getHiddenModulesList(),
                 user.getReadOnlyModulesList()
         );

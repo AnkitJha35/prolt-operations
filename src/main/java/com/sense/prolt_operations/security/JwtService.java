@@ -32,7 +32,7 @@ public class JwtService {
     @Value("${app.jwt.secret:}")
     private String secret;
 
-    @Value("${app.jwt.expires-in:7d}")
+    @Value("${app.jwt.expires-in:15m}")
     private String expiresIn;
 
     @Autowired(required = false)
@@ -62,46 +62,58 @@ public class JwtService {
 
     private long parseExpiration(String exp) {
         if (exp == null || exp.isBlank()) {
-            return 7L * 24 * 60 * 60 * 1000L; // default 7d
+            return 15L * 60 * 1000L; // default 15m
         }
         String clean = exp.trim().toLowerCase();
+        long millis;
         try {
             if (clean.endsWith("d")) {
                 long days = Long.parseLong(clean.substring(0, clean.length() - 1));
-                return days * 24 * 60 * 60 * 1000L;
+                millis = days * 24 * 60 * 60 * 1000L;
             } else if (clean.endsWith("h")) {
                 long hours = Long.parseLong(clean.substring(0, clean.length() - 1));
-                return hours * 60 * 60 * 1000L;
+                millis = hours * 60 * 60 * 1000L;
             } else if (clean.endsWith("m")) {
                 long minutes = Long.parseLong(clean.substring(0, clean.length() - 1));
-                return minutes * 60 * 1000L;
+                millis = minutes * 60 * 1000L;
             } else if (clean.endsWith("s")) {
                 long seconds = Long.parseLong(clean.substring(0, clean.length() - 1));
-                return seconds * 1000L;
+                millis = seconds * 1000L;
             } else {
-                return Long.parseLong(clean);
+                millis = Long.parseLong(clean);
             }
         } catch (NumberFormatException e) {
-            log.warn("Failed to parse JWT expires-in '{}', defaulting to 7 days", exp);
-            return 7L * 24 * 60 * 60 * 1000L;
+            log.warn("Failed to parse JWT expires-in '{}', defaulting to 15 minutes", exp);
+            return 15L * 60 * 1000L;
         }
+
+        if (millis <= 0) {
+            throw new IllegalArgumentException("JWT expiration must be strictly positive (got " + millis + " ms)");
+        }
+        return millis;
+    }
+
+    public long getExpirationMillis() {
+        return expirationMillis;
     }
 
     public String generateToken(User user) {
         List<String> hidden = user.getHiddenModulesList();
         List<String> readOnly = user.getReadOnlyModulesList();
-        return generateToken(user.getId(), user.getUsername(), user.getRole(), hidden, readOnly);
+        return generateToken(user.getId(), user.getUsername(), user.getRole(), user.getTokenVersion(), hidden, readOnly);
     }
 
-    public String generateToken(String id, String username, Role role,
+    public String generateToken(String id, String username, Role role, int tokenVersion,
                                 List<String> hiddenModules, List<String> readOnlyModules) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMillis);
 
         return Jwts.builder()
+                .subject(id)
                 .claim("id", id)
                 .claim("username", username)
                 .claim("role", role != null ? role.name() : Role.CLIENT.name())
+                .claim("tokenVersion", tokenVersion)
                 .claim("hiddenModules", hiddenModules != null ? hiddenModules : Collections.emptyList())
                 .claim("readOnlyModules", readOnlyModules != null ? readOnlyModules : Collections.emptyList())
                 .issuedAt(now)
@@ -110,13 +122,18 @@ public class JwtService {
                 .compact();
     }
 
+    public String generateToken(String id, String username, Role role,
+                                List<String> hiddenModules, List<String> readOnlyModules) {
+        return generateToken(id, username, role, 0, hiddenModules, readOnlyModules);
+    }
+
     /**
      * Retained for callers that still supply an email. Node's JWT payload never
      * contained email, so the value is intentionally not serialized.
      */
     public String generateToken(String id, String username, String email, Role role,
                                 List<String> hiddenModules, List<String> readOnlyModules) {
-        return generateToken(id, username, role, hiddenModules, readOnlyModules);
+        return generateToken(id, username, role, 0, hiddenModules, readOnlyModules);
     }
 
     public Claims getClaims(String token) {
@@ -147,12 +164,15 @@ public class JwtService {
         String id = claims.get("id", String.class);
         String username = claims.get("username", String.class);
         String role = claims.get("role", String.class);
+        Object tvObj = claims.get("tokenVersion");
+        int tokenVersion = (tvObj instanceof Number num) ? num.intValue() : 0;
         List<String> hidden = claims.get("hiddenModules", List.class);
         List<String> readOnly = claims.get("readOnlyModules", List.class);
         long issuedAt = claims.getIssuedAt() != null ? claims.getIssuedAt().getTime() / 1000 : 0;
         long expiresAt = claims.getExpiration() != null ? claims.getExpiration().getTime() / 1000 : 0;
 
         return new ProltUserPrincipal(id, username, role != null ? role : Role.CLIENT.name(),
+                tokenVersion,
                 hidden != null ? hidden : Collections.emptyList(),
                 readOnly != null ? readOnly : Collections.emptyList(), issuedAt, expiresAt);
     }

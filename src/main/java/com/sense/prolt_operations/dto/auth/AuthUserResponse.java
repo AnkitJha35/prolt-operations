@@ -9,11 +9,16 @@ public record AuthUserResponse(
     String email,
     String fullName,
     String role,
+    boolean enabled,
     List<String> hiddenModules,
     List<String> readOnlyModules
 ) {
+    public AuthUserResponse(String id, String username, String email, String fullName, String role, List<String> hiddenModules, List<String> readOnlyModules) {
+        this(id, username, email, fullName, role, true, hiddenModules, readOnlyModules);
+    }
+
     public AuthUserResponse(String id, String username, String email, String role, List<String> hiddenModules, List<String> readOnlyModules) {
-        this(id, username, email, null, role, hiddenModules, readOnlyModules);
+        this(id, username, email, null, role, true, hiddenModules, readOnlyModules);
     }
 
     @JsonProperty("name")

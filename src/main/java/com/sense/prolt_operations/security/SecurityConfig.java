@@ -10,8 +10,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -28,18 +26,21 @@ public class SecurityConfig {
     private final UploadRateLimiterFilter uploadRateLimiterFilter;
     private final RestAuthenticationEntryPoint authEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final com.sense.prolt_operations.security.cors.CorsConfigValidator corsValidator;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthFilter,
             AuthRateLimiterFilter authRateLimiterFilter,
             UploadRateLimiterFilter uploadRateLimiterFilter,
             RestAuthenticationEntryPoint authEntryPoint,
-            RestAccessDeniedHandler accessDeniedHandler) {
+            RestAccessDeniedHandler accessDeniedHandler,
+            com.sense.prolt_operations.security.cors.CorsConfigValidator corsValidator) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authRateLimiterFilter = authRateLimiterFilter;
         this.uploadRateLimiterFilter = uploadRateLimiterFilter;
         this.authEntryPoint = authEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.corsValidator = corsValidator;
     }
 
     @Bean
@@ -71,13 +72,15 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                 .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
 
-                // Public auth endpoints
-                .requestMatchers("/api/auth/login", "/api/auth/send-otp", "/api/auth/verify-otp").permitAll()
+                // Public auth endpoints (decommissioned /login returns 404 via MVC dispatcher rather than 401)
+                .requestMatchers("/api/auth/send-otp", "/api/auth/verify-otp", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
 
                 // Public functional endpoints (exact parity with Node)
                 .requestMatchers("/api/dashboard/**").permitAll()
-                .requestMatchers("/api/resource-center/**").permitAll()
-                .requestMatchers("/api/database/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/resource-center/**").permitAll()
+                .requestMatchers("/api/resource-center/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/database/**").permitAll()
+                .requestMatchers("/api/database/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                 .requestMatchers("/api/logs/**").permitAll()
                 .requestMatchers("/api/market-operations/**").permitAll()
                 .requestMatchers("/api/forecast/**", "/forecast/**").permitAll()
@@ -98,7 +101,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/landing-price-calc/**").authenticated()
                 .requestMatchers("/api/savings-calculator/**", "/api/savings-calculator-new/**").authenticated()
                 .requestMatchers("/api/uploads/**").authenticated()
-                .requestMatchers("/api/auth/me").authenticated()
+                .requestMatchers("/api/auth/me", "/api/auth/sessions", "/api/auth/sessions/**").authenticated()
 
                 // Fallback
                 .anyRequest().authenticated()
@@ -112,19 +115,59 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOriginPattern("*");
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
+        CorsConfiguration configuration = new CorsConfiguration();
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+        if (corsValidator != null && corsValidator.isProduction()) {
+            configuration.setAllowedOrigins(corsValidator.getParsedAllowedOrigins());
+            configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With",
+                "User-Agent",
+                "Cache-Control",
+                "Keep-Alive",
+                "X-Forwarded-For",
+                "RateLimit-Limit",
+                "RateLimit-Remaining",
+                "RateLimit-Reset"
+            ));
+            configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "Set-Cookie",
+                "RateLimit-Limit",
+                "RateLimit-Remaining",
+                "RateLimit-Reset",
+                "Retry-After",
+                "Content-Disposition",
+                "Content-Type"
+            ));
+        } else {
+            configuration.setAllowedOriginPatterns(List.of("*"));
+            configuration.setAllowedHeaders(List.of("*"));
+            configuration.setExposedHeaders(List.of("*"));
+        }
+
+        configuration.setAllowedMethods(List.of(
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+            "HEAD"
+        ));
+
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source =
+            new UrlBasedCorsConfigurationSource();
+
+        source.registerCorsConfiguration("/**", configuration);
+
+        return source;
     }
 
     @Bean

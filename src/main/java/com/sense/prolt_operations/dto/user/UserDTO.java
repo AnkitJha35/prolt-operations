@@ -9,11 +9,16 @@ public record UserDTO(
     String email,
     String fullName,
     String role,
+    boolean enabled,
     List<String> hiddenModules,
     List<String> readOnlyModules,
     LocalDateTime createdAt
 ) {
+    public UserDTO(String id, String username, String email, String fullName, String role, List<String> hiddenModules, List<String> readOnlyModules, LocalDateTime createdAt) {
+        this(id, username, email, fullName, role, true, hiddenModules, readOnlyModules, createdAt);
+    }
+
     public UserDTO(String id, String username, String email, String role, List<String> hiddenModules, List<String> readOnlyModules, LocalDateTime createdAt) {
-        this(id, username, email, null, role, hiddenModules, readOnlyModules, createdAt);
+        this(id, username, email, null, role, true, hiddenModules, readOnlyModules, createdAt);
     }
 }

@@ -12,18 +12,20 @@ public class ProltUserPrincipal implements UserDetails {
     private final String id;
     private final String username;
     private final String role;
+    private final int tokenVersion;
     private final List<String> hiddenModules;
     private final List<String> readOnlyModules;
     private final long issuedAt;
     private final long expiresAt;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    public ProltUserPrincipal(String id, String username, String role,
+    public ProltUserPrincipal(String id, String username, String role, int tokenVersion,
                               List<String> hiddenModules, List<String> readOnlyModules,
                               long issuedAt, long expiresAt) {
         this.id = id;
         this.username = username;
         this.role = role;
+        this.tokenVersion = tokenVersion;
         this.hiddenModules = hiddenModules != null ? hiddenModules : Collections.emptyList();
         this.readOnlyModules = readOnlyModules != null ? readOnlyModules : Collections.emptyList();
         this.issuedAt = issuedAt;
@@ -34,12 +36,22 @@ public class ProltUserPrincipal implements UserDetails {
         );
     }
 
+    public ProltUserPrincipal(String id, String username, String role,
+                              List<String> hiddenModules, List<String> readOnlyModules,
+                              long issuedAt, long expiresAt) {
+        this(id, username, role, 0, hiddenModules, readOnlyModules, issuedAt, expiresAt);
+    }
+
     public String getId() {
         return id;
     }
 
     public String getRole() {
         return role;
+    }
+
+    public int getTokenVersion() {
+        return tokenVersion;
     }
 
     public List<String> getHiddenModules() {

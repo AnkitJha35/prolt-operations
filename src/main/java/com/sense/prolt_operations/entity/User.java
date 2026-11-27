@@ -25,9 +25,6 @@ public class User implements Serializable {
     @Column(name = "fullName", length = 100, nullable = false)
     private String fullName;
 
-    @Column(name = "passwordHash")
-    private String passwordHash;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
     private Role role;
@@ -37,6 +34,12 @@ public class User implements Serializable {
 
     @Column(name = "readOnlyModules")
     private String[] readOnlyModules = new String[0];
+
+    @Column(name = "enabled", nullable = false)
+    private boolean enabled = true;
+
+    @Column(name = "tokenVersion", nullable = false)
+    private int tokenVersion = 0;
 
     @Column(name = "createdAt")
     private LocalDateTime createdAt;
@@ -75,16 +78,15 @@ public class User implements Serializable {
         return new User();
     }
 
-    public User(String id, String username, String email, String passwordHash, Role role) {
-        this(id, username, email, null, passwordHash, role);
+    public User(String id, String username, String email, Role role) {
+        this(id, username, email, null, role);
     }
 
-    public User(String id, String username, String email, String fullName, String passwordHash, Role role) {
+    public User(String id, String username, String email, String fullName, Role role) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.fullName = fullName;
-        this.passwordHash = passwordHash;
         this.role = role;
     }
 
@@ -118,14 +120,6 @@ public class User implements Serializable {
 
     public void setFullName(String fullName) {
         this.fullName = fullName;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
     }
 
     public Role getRole() {
@@ -168,6 +162,14 @@ public class User implements Serializable {
         this.readOnlyModules = list != null ? list.toArray(new String[0]) : new String[0];
     }
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -182,6 +184,18 @@ public class User implements Serializable {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public int getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(int tokenVersion) {
+        this.tokenVersion = tokenVersion;
+    }
+
+    public void incrementTokenVersion() {
+        this.tokenVersion++;
     }
 
     @Override
@@ -199,6 +213,6 @@ public class User implements Serializable {
 
     @Override
     public String toString() {
-        return "User{" + "id=" + id + ", " + "username=" + username + ", " + "email=" + email + ", " + "fullName=" + fullName + ", " + "passwordHash=" + passwordHash + ", " + "createdAt=" + createdAt + ", " + "updatedAt=" + updatedAt + "}";
+        return "User{" + "id=" + id + ", " + "username=" + username + ", " + "email=" + email + ", " + "fullName=" + fullName + ", " + "enabled=" + enabled + ", " + "tokenVersion=" + tokenVersion + ", " + "createdAt=" + createdAt + ", " + "updatedAt=" + updatedAt + "}";
     }
 }
