@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ProltMarginRepository extends JpaRepository<ProltMargin, String>, JpaSpecificationExecutor<ProltMargin> {
+public interface ProltMarginRepository extends JpaRepository<ProltMargin, Integer>, JpaSpecificationExecutor<ProltMargin> {
 }

@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface DiscomListRepository extends JpaRepository<DiscomList, String>, JpaSpecificationExecutor<DiscomList> {
+public interface DiscomListRepository extends JpaRepository<DiscomList, Integer>, JpaSpecificationExecutor<DiscomList> {
 }

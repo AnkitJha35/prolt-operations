@@ -5,6 +5,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
-public interface IexFeesRepository extends JpaRepository<IexFees, String>, JpaSpecificationExecutor<IexFees> {
+public interface IexFeesRepository extends JpaRepository<IexFees, Integer>, JpaSpecificationExecutor<IexFees> {
+
+    Optional<IexFees> findFirstByMonth(Integer month);
+
+    Optional<IexFees> findFirstByOrderByMonthDesc();
 }
