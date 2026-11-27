@@ -17,8 +17,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sense.prolt_operations.dto.response.ApiResponse;
+import com.sense.prolt_operations.dto.response.OperationResponse;
 import com.sense.prolt_operations.exception.BadRequestException;
 import com.sense.prolt_operations.service.ResourceCenterService;
+
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,17 +42,15 @@ public class ResourceCenterController {
 
     @GetMapping("/{resourceType}")
     @Operation(summary = "Get resource center records", description = "Retrieves all records for given resourceType")
-    public ResponseEntity<Map<String, Object>> getResourceData(@PathVariable("resourceType") String resourceType) {
+    public ResponseEntity<ApiResponse<List<?>>> getResourceData(@PathVariable("resourceType") String resourceType) {
         List<?> data = resourceCenterService.getResourceData(resourceType);
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "data", data
-        ));
+        return ResponseEntity.ok(ApiResponse.ok(data));
     }
 
     @PostMapping("/{resourceType}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Create resource center record", description = "Creates a single record in the specified resource table")
-    public ResponseEntity<Map<String, Object>> createResourceRecord(
+    public ResponseEntity<ApiResponse<Object>> createResourceRecord(
             @PathVariable("resourceType") String resourceType,
             @RequestBody(required = false) Map<String, Object> payload) {
 
@@ -57,16 +59,13 @@ public class ResourceCenterController {
         }
 
         Object data = resourceCenterService.createResourceRecord(resourceType, payload);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-            "success", true,
-            "message", "Record created successfully",
-            "data", data
-        ));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Record created successfully", data));
     }
 
     @PostMapping("/{resourceType}/bulk")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Bulk create resource center records", description = "Creates or upserts multiple records in the specified table")
-    public ResponseEntity<Map<String, Object>> createBulkResourceRecords(
+    public ResponseEntity<ApiResponse<List<?>>> createBulkResourceRecords(
             @PathVariable("resourceType") String resourceType,
             @RequestBody(required = false) JsonNode payload) {
 
@@ -90,10 +89,9 @@ public class ResourceCenterController {
         }
 
         List<?> results = resourceCenterService.createBulkResourceRecords(resourceType, validPayload);
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-            "success", true,
-            "message", String.format("Bulk uploaded %d records successfully", validPayload.size()),
-            "data", results
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(
+            String.format("Bulk uploaded %d records successfully", validPayload.size()),
+            results
         ));
     }
 
@@ -103,8 +101,9 @@ public class ResourceCenterController {
     }
 
     @PutMapping("/{resourceType}/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Update resource center record", description = "Updates a record by ID")
-    public ResponseEntity<Map<String, Object>> updateResourceRecord(
+    public ResponseEntity<ApiResponse<Object>> updateResourceRecord(
             @PathVariable("resourceType") String resourceType,
             @PathVariable("id") String id,
             @RequestBody(required = false) Map<String, Object> payload) {
@@ -115,25 +114,19 @@ public class ResourceCenterController {
         }
 
         Object updated = resourceCenterService.updateResourceRecord(resourceType, numId, payload);
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Record updated successfully",
-            "data", updated
-        ));
+        return ResponseEntity.ok(ApiResponse.ok("Record updated successfully", updated));
     }
 
     @DeleteMapping("/{resourceType}/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Delete resource center record", description = "Deletes a record by ID")
-    public ResponseEntity<Map<String, Object>> deleteResourceRecord(
+    public ResponseEntity<OperationResponse> deleteResourceRecord(
             @PathVariable("resourceType") String resourceType,
             @PathVariable("id") String id) {
 
         Integer numId = parseId(id);
         resourceCenterService.deleteResourceRecord(resourceType, numId);
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Record deleted successfully"
-        ));
+        return ResponseEntity.ok(OperationResponse.ok("Record deleted successfully"));
     }
 
     private Integer parseId(String id) {

@@ -185,16 +185,16 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                     .load();
 
             int executed = flyway.migrate().migrationsExecuted;
-            assertThat(executed).isEqualTo(10);
+            assertThat(executed).isEqualTo(14);
 
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
             assertThat(flyway.info().current().getState().isApplied()).isTrue();
 
-            // Verify all 58 canonical tables exist
+            // Verify all 59 canonical tables exist (58 historical + user_refresh_sessions)
             List<String> publicTables = listApplicationTables(dbUrl, "public");
             List<String> forecastingTables = listApplicationTables(dbUrl, "forecasting");
-            assertThat(publicTables.size() + forecastingTables.size()).isEqualTo(58);
-            assertThat(publicTables).contains("dsm_charges", "exchange_dam_rate", "exchange_rtm_rate");
+            assertThat(publicTables.size() + forecastingTables.size()).isEqualTo(59);
+            assertThat(publicTables).contains("dsm_charges", "exchange_dam_rate", "exchange_rtm_rate", "user_refresh_sessions");
 
             // Verify exchange_dam_rate and exchange_rtm_rate IDs are bigint
             try (Connection conn = DriverManager.getConnection(dbUrl, postgres.getUsername(), postgres.getPassword());
@@ -288,15 +288,15 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                     .load();
 
             int executed = flyway.migrate().migrationsExecuted;
-            assertThat(executed).isEqualTo(5); // V6, V7, V8, V9, and V10 applied cleanly
+            assertThat(executed).isEqualTo(9); // V6..V14 applied cleanly
 
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
             assertThat(flyway.info().current().getState().isApplied()).isTrue();
 
-            // Verify dsm_charges is now created and total tables is 58
+            // Verify dsm_charges is now created and total tables is 59
             List<String> tablesAfter = listApplicationTables(dbUrl, "public");
-            assertThat(tablesAfter).contains("dsm_charges");
-            assertThat(tablesAfter.size() + listApplicationTables(dbUrl, "forecasting").size()).isEqualTo(58);
+            assertThat(tablesAfter).contains("dsm_charges", "user_refresh_sessions");
+            assertThat(tablesAfter.size() + listApplicationTables(dbUrl, "forecasting").size()).isEqualTo(59);
 
             // Verify unique index on dsm_charges
             try (Connection conn = DriverManager.getConnection(dbUrl, postgres.getUsername(), postgres.getPassword());
@@ -356,12 +356,12 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                     .load();
 
             flyway.migrate();
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
 
             // Sub-test A: Second migrate() invocation is an absolute no-op
             int secondRun = flyway.migrate().migrationsExecuted;
             assertThat(secondRun).isZero();
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
 
             // Sub-test B: Raw DDL replay (CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS) is completely safe
             executeSql(dbUrl, """
@@ -474,7 +474,7 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                     """, uid, uid, uid));
             }).hasMessageContaining("uq_user_username_lower_trim");
 
-            // Migrate to V8 so all entity attributes (like fullName) are present
+            // Part 8: Migrate to V8, backfill fullName for test users, then migrate to V14 to validate Hibernate schema
             Flyway flywayV8 = Flyway.configure()
                     .dataSource(dbUrl, postgres.getUsername(), postgres.getPassword())
                     .schemas("public", "forecasting")
@@ -486,7 +486,18 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
             assertThat(v8Migrated).isEqualTo(1);
             assertThat(flywayV8.info().current().getVersion().getVersion()).isEqualTo("8");
 
-            // Part 8: Verify Hibernate validation succeeds on the schema after V8
+            executeSql(dbUrl, "UPDATE public.\"User\" SET \"fullName\" = 'Test User' WHERE \"fullName\" IS NULL;");
+
+            Flyway flywayV14 = Flyway.configure()
+                    .dataSource(dbUrl, postgres.getUsername(), postgres.getPassword())
+                    .schemas("public", "forecasting")
+                    .defaultSchema("public")
+                    .locations("classpath:db/migration")
+                    .target("14")
+                    .load();
+            flywayV14.migrate();
+            assertThat(flywayV14.info().current().getVersion().getVersion()).isEqualTo("14");
+
             validateHibernateSchema(dbUrl);
 
         } finally {
@@ -593,7 +604,18 @@ class IsolatedMigrationRehearsalTest extends BaseIntegrationTest {
                 VALUES ('user-id-v8-4-%s', 'user4_%s', 'unique_%s@probus.io', 'Dr. Alice Smith', 'hash4', 'CLIENT', NOW(), NOW());
                 """, uid, uid, uid));
 
-            // Part 11: Verify Hibernate validation succeeds on the schema after V8
+            // Part 11: Backfill fullName for any test users, migrate to V14 so all entity attributes are present, then verify Hibernate validation
+            executeSql(dbUrl, "UPDATE public.\"User\" SET \"fullName\" = 'Test User' WHERE \"fullName\" IS NULL;");
+
+            Flyway flywayV14 = Flyway.configure()
+                    .dataSource(dbUrl, postgres.getUsername(), postgres.getPassword())
+                    .schemas("public", "forecasting")
+                    .defaultSchema("public")
+                    .locations("classpath:db/migration")
+                    .target("14")
+                    .load();
+            flywayV14.migrate();
+            assertThat(flywayV14.info().current().getVersion().getVersion()).isEqualTo("14");
             validateHibernateSchema(dbUrl);
 
         } finally {

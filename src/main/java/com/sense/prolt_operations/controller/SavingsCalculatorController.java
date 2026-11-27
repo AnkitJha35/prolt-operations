@@ -1,21 +1,33 @@
 package com.sense.prolt_operations.controller;
 
-import com.sense.prolt_operations.dto.calculator.CreateSavingsEntryDTO;
-import com.sense.prolt_operations.dto.calculator.LandedCostCalcRequest;
-import com.sense.prolt_operations.dto.calculator.LandedCostCalcResponse;
-import com.sense.prolt_operations.dto.calculator.SavingsEntryDTO;
-import com.sense.prolt_operations.security.ProltUserPrincipal;
-import com.sense.prolt_operations.service.ExcelExportService;
-import com.sense.prolt_operations.service.SavingsCalculatorService;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
+import com.sense.prolt_operations.dto.calculator.CreateSavingsEntryDTO;
+import com.sense.prolt_operations.dto.calculator.LandedCostCalcRequest;
+import com.sense.prolt_operations.dto.calculator.LandedCostCalcResponse;
+import com.sense.prolt_operations.dto.calculator.SavingsEntryDTO;
+import com.sense.prolt_operations.dto.response.MessageResponse;
+import com.sense.prolt_operations.exception.BadRequestException;
+import com.sense.prolt_operations.exception.NotFoundException;
+import com.sense.prolt_operations.security.ProltUserPrincipal;
+import com.sense.prolt_operations.service.ExcelExportService;
+import com.sense.prolt_operations.service.SavingsCalculatorService;
 
 @RestController
 @RequestMapping("/api/savings-calculator")
@@ -44,31 +56,30 @@ public class SavingsCalculatorController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getById(@PathVariable String id) {
+    public ResponseEntity<SavingsEntryDTO> getById(@PathVariable String id) {
         SavingsEntryDTO entry = savingsCalculatorService.getById(id);
         if (entry == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Entry not found."));
+            throw new NotFoundException("Entry not found.");
         }
         return ResponseEntity.ok(entry);
     }
 
     @GetMapping("/{id}/overview")
-    public ResponseEntity<?> getClientOverview(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> getClientOverview(@PathVariable String id) {
         return ResponseEntity.ok(savingsCalculatorService.getClientOverview(id));
     }
 
     @GetMapping("/{id}/history")
-    public ResponseEntity<?> getHistory(@PathVariable String id) {
+    public ResponseEntity<List<Map<String, Object>>> getHistory(@PathVariable String id) {
         return ResponseEntity.ok(savingsCalculatorService.getHistory(id));
     }
 
     @PostMapping
-    public ResponseEntity<?> create(
+    public ResponseEntity<SavingsEntryDTO> create(
             @RequestBody CreateSavingsEntryDTO dto,
             @AuthenticationPrincipal ProltUserPrincipal principal) {
         if (dto.clientName() == null || dto.industryName() == null || dto.address() == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Missing required fields: clientName, industryName, address."));
+            throw new BadRequestException("Missing required fields: clientName, industryName, address.");
         }
         String username = principal != null ? principal.getUsername() : "system";
         SavingsEntryDTO entry = savingsCalculatorService.create(dto, username);
@@ -76,13 +87,12 @@ public class SavingsCalculatorController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(
+    public ResponseEntity<SavingsEntryDTO> update(
             @PathVariable String id,
             @RequestBody CreateSavingsEntryDTO dto,
             @AuthenticationPrincipal ProltUserPrincipal principal) {
         if (dto.clientName() == null || dto.industryName() == null || dto.address() == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Missing required fields: clientName, industryName, address."));
+            throw new BadRequestException("Missing required fields: clientName, industryName, address.");
         }
         String username = principal != null ? principal.getUsername() : "system";
         SavingsEntryDTO entry = savingsCalculatorService.update(id, dto, username);
@@ -90,17 +100,17 @@ public class SavingsCalculatorController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(
+    public ResponseEntity<MessageResponse> delete(
             @PathVariable String id,
             @AuthenticationPrincipal ProltUserPrincipal principal) {
         String role = principal != null ? principal.getRole() : "USER";
         List<String> readOnly = principal != null ? principal.getReadOnlyModules() : List.of();
         savingsCalculatorService.delete(id, role, readOnly);
-        return ResponseEntity.ok(Map.of("message", "Entry deleted successfully."));
+        return ResponseEntity.ok(new MessageResponse("Entry deleted successfully."));
     }
 
     @PostMapping("/{id}/calculate")
-    public ResponseEntity<?> calculate(
+    public ResponseEntity<Map<String, Object>> calculate(
             @PathVariable String id,
             @RequestParam(required = false) String month,
             @RequestParam(required = false) Integer version) {
@@ -108,7 +118,7 @@ public class SavingsCalculatorController {
     }
 
     @PostMapping("/{id}/calculate-market-decision")
-    public ResponseEntity<?> calculateMarketDecision(
+    public ResponseEntity<Map<String, Object>> calculateMarketDecision(
             @PathVariable String id,
             @RequestParam(required = false) String month,
             @RequestParam(required = false) Integer version) {
@@ -116,7 +126,7 @@ public class SavingsCalculatorController {
     }
 
     @PostMapping("/{id}/demand-shift-insights")
-    public ResponseEntity<?> getDemandShiftInsights(
+    public ResponseEntity<Map<String, Object>> getDemandShiftInsights(
             @PathVariable String id,
             @RequestParam(required = false) String month,
             @RequestParam(required = false) Integer version) {

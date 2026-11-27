@@ -28,6 +28,7 @@ import com.sense.prolt_operations.entity.TraderPerformanceEntryHistory;
 import com.sense.prolt_operations.repository.TraderPerformanceEntryHistoryRepository;
 import com.sense.prolt_operations.repository.TraderPerformanceEntryRepository;
 import com.sense.prolt_operations.security.JwtService;
+import com.sense.prolt_operations.testutil.TestUserHelper;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -48,13 +49,27 @@ class TraderPerformanceAuditingIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private TraderPerformanceEntryHistoryRepository historyRepository;
 
+    private TestUserHelper.TestUser traderUser;
+    private TestUserHelper.TestUser updaterUser;
     private String traderToken;
     private String updaterToken;
 
     @BeforeEach
     void setUp() {
-        traderToken = "Bearer " + jwtService.generateToken("trader1", "traderUser", "trader@probus.io", Role.CLIENT, List.of(), List.of());
-        updaterToken = "Bearer " + jwtService.generateToken("updater1", "updaterUser", "updater@probus.io", Role.ADMIN, List.of(), List.of());
+        traderUser = createTestUser(Role.CLIENT, "traderUser", "trader@probus.io");
+        updaterUser = createTestUser(Role.ADMIN, "updaterUser", "updater@probus.io");
+        traderToken = traderUser.getBearerToken();
+        updaterToken = updaterUser.getBearerToken();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        if (traderUser != null) {
+            deleteTestUser(traderUser);
+        }
+        if (updaterUser != null) {
+            deleteTestUser(updaterUser);
+        }
     }
 
     @Test

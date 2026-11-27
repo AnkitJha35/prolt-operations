@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sense.prolt_operations.dto.response.ApiResponse;
 import com.sense.prolt_operations.exception.BadRequestException;
 import com.sense.prolt_operations.service.UpMarketService;
 
@@ -30,7 +31,7 @@ public class UpMarketController {
 
     @GetMapping("/{market}")
     @Operation(summary = "Get UP regional market data", description = "Fetches interval market data for DAM, RTM, or GDAM with regional analytics")
-    public ResponseEntity<Map<String, Object>> getMarketData(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getMarketData(
             @PathVariable("market") String market,
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate,
@@ -53,15 +54,9 @@ public class UpMarketController {
         @SuppressWarnings("unchecked")
         List<?> intervals = (List<?>) data.get("intervals");
         if (intervals == null || intervals.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                "success", false,
-                "message", "No data found"
-            ));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("No data found"));
         }
 
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "data", data
-        ));
+        return ResponseEntity.ok(ApiResponse.ok(data));
     }
 }

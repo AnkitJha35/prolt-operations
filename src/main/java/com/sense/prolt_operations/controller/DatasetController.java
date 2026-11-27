@@ -1,6 +1,7 @@
 package com.sense.prolt_operations.controller;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -13,6 +14,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sense.prolt_operations.dto.response.ApiResponse;
+import com.sense.prolt_operations.dto.response.DatasetDTO;
+import com.sense.prolt_operations.dto.response.DatasetSummaryResponse;
+import com.sense.prolt_operations.dto.response.OperationResponse;
+import com.sense.prolt_operations.dto.response.PaginatedResponse;
+import com.sense.prolt_operations.dto.response.TimeseriesResponse;
+import com.sense.prolt_operations.dto.response.UploadHistoryDTO;
 import com.sense.prolt_operations.service.DatasetService;
 import com.sense.prolt_operations.service.PersistenceService;
 
@@ -31,52 +39,37 @@ public class DatasetController {
     }
 
     @GetMapping("/summary")
-    public ResponseEntity<Map<String, Object>> getDatasetSummary() {
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "data", datasetService.getSummary()
-        ));
+    public ResponseEntity<ApiResponse<DatasetSummaryResponse>> getDatasetSummary() {
+        return ResponseEntity.ok(ApiResponse.ok(datasetService.getSummary()));
     }
 
     @GetMapping("/timeseries")
-    public ResponseEntity<Map<String, Object>> getTimeseries(
+    public ResponseEntity<TimeseriesResponse> getTimeseries(
             @RequestParam(required = false) String date,
             @RequestParam(required = false) String market) {
         return ResponseEntity.ok(datasetService.getTimeseries(date, market));
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getDatasets(@RequestParam Map<String, String> query) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.putAll(datasetService.getDatasets(query));
-        return ResponseEntity.ok(result);
+    public ResponseEntity<PaginatedResponse<DatasetDTO>> getDatasets(@RequestParam Map<String, String> query) {
+        return ResponseEntity.ok(datasetService.getDatasets(query));
     }
 
     @GetMapping("/{datasetId}")
-    public ResponseEntity<Map<String, Object>> getDatasetById(@PathVariable String datasetId) {
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "data", datasetService.getDatasetById(datasetId)
-        ));
+    public ResponseEntity<ApiResponse<DatasetDTO>> getDatasetById(@PathVariable String datasetId) {
+        return ResponseEntity.ok(ApiResponse.ok(datasetService.getDatasetById(datasetId)));
     }
 
     @GetMapping("/{datasetId}/history")
-    public ResponseEntity<Map<String, Object>> getDatasetHistory(@PathVariable String datasetId) {
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "data", datasetService.getDatasetHistory(datasetId)
-        ));
+    public ResponseEntity<ApiResponse<List<UploadHistoryDTO>>> getDatasetHistory(@PathVariable String datasetId) {
+        return ResponseEntity.ok(ApiResponse.ok(datasetService.getDatasetHistory(datasetId)));
     }
 
     @DeleteMapping("/{datasetId}")
-    public ResponseEntity<Map<String, Object>> deleteDataset(@PathVariable String datasetId) {
+    public ResponseEntity<OperationResponse> deleteDataset(@PathVariable String datasetId) {
         log.info("Received API request to delete dataset {}", datasetId);
         persistenceService.deleteDataset(datasetId);
         log.info("Successfully processed deletion for dataset {}", datasetId);
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Dataset deleted successfully"
-        ));
+        return ResponseEntity.ok(OperationResponse.ok("Dataset deleted successfully"));
     }
 }

@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,9 +19,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sense.prolt_operations.entity.Role;
+import com.sense.prolt_operations.testutil.TestUserHelper;
 
 @AutoConfigureMockMvc
 public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
@@ -29,6 +34,34 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    private String adminToken;
+    private TestUserHelper.TestUser testUser;
+
+    @BeforeEach
+    void setUp() {
+        testUser = createTestUser(Role.ADMIN);
+        adminToken = testUser.getToken();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (testUser != null) {
+            deleteTestUser(testUser);
+        }
+    }
+
+    private MockHttpServletRequestBuilder authPost(String url) {
+        return post(url).header("Authorization", "Bearer " + adminToken);
+    }
+
+    private MockHttpServletRequestBuilder authPut(String url) {
+        return put(url).header("Authorization", "Bearer " + adminToken);
+    }
+
+    private MockHttpServletRequestBuilder authDelete(String url) {
+        return delete(url).header("Authorization", "Bearer " + adminToken);
+    }
 
     @Test
     @DisplayName("RC-01: Region State CRUD with complete field mappings")
@@ -42,7 +75,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "stateOrUt", "state"
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/region-state")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/region-state")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -61,7 +94,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "regionalGrid", "Northern-Updated",
             "stateCode", "PB_UPD"
         );
-        mockMvc.perform(put("/api/resource-center/region-state/" + id)
+        mockMvc.perform(authPut("/api/resource-center/region-state/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePayload)))
                 .andExpect(status().isOk())
@@ -69,7 +102,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.stateCode").value("PB_UPD"));
 
         // Delete
-        mockMvc.perform(delete("/api/resource-center/region-state/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/region-state/" + id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Record deleted successfully"));
     }
@@ -84,7 +117,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "discomType", "Private"
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/discom-list")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/discom-list")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -96,14 +129,14 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
         int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
 
         // Update
-        mockMvc.perform(put("/api/resource-center/discom-list/" + id)
+        mockMvc.perform(authPut("/api/resource-center/discom-list/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("discomType", "Government"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.discomType").value("Government"));
 
         // Delete
-        mockMvc.perform(delete("/api/resource-center/discom-list/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/discom-list/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -116,7 +149,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "istsLossPercent", 3.45
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/ists-charges")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/ists-charges")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -125,13 +158,13 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
         int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
 
-        mockMvc.perform(put("/api/resource-center/ists-charges/" + id)
+        mockMvc.perform(authPut("/api/resource-center/ists-charges/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("istsLossPercent", 3.85))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.istsLossPercent").value(3.85));
 
-        mockMvc.perform(delete("/api/resource-center/ists-charges/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/ists-charges/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -148,7 +181,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "otherFixCharges", 150
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/iex-fees")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/iex-fees")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -158,13 +191,13 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
         int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
 
-        mockMvc.perform(put("/api/resource-center/iex-fees/" + id)
+        mockMvc.perform(authPut("/api/resource-center/iex-fees/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("exchangeFees", 0.025))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.exchangeFees").value(0.025));
 
-        mockMvc.perform(delete("/api/resource-center/iex-fees/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/iex-fees/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -180,7 +213,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "proltMarginGst", 0.009
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/prolt-margin")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/prolt-margin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -190,13 +223,13 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
         int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
 
-        mockMvc.perform(put("/api/resource-center/prolt-margin/" + id)
+        mockMvc.perform(authPut("/api/resource-center/prolt-margin/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("tradingMargin", 0.06))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tradingMargin").value(0.06));
 
-        mockMvc.perform(delete("/api/resource-center/prolt-margin/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/prolt-margin/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -220,7 +253,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             Map.entry("consumptionMonth", 202609)
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/state-tariff")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/state-tariff")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -239,14 +272,14 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
         int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
 
-        mockMvc.perform(put("/api/resource-center/state-tariff/" + id)
+        mockMvc.perform(authPut("/api/resource-center/state-tariff/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("energyRate", 8.10, "todChargePercent", 20))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.energyRate").value(8.10))
                 .andExpect(jsonPath("$.data.todChargePercent").value(20));
 
-        mockMvc.perform(delete("/api/resource-center/state-tariff/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/state-tariff/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -261,7 +294,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "fppaChargePercent", 2.35
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/fppa-charges")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/fppa-charges")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -272,13 +305,13 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
         int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
 
-        mockMvc.perform(put("/api/resource-center/fppa-charges/" + id)
+        mockMvc.perform(authPut("/api/resource-center/fppa-charges/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("fppaChargePercent", -1.5))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fppaChargePercent").value(-1.5));
 
-        mockMvc.perform(delete("/api/resource-center/fppa-charges/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/fppa-charges/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -286,7 +319,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
     @DisplayName("RC-08: Not found and invalid ID format error responses")
     void testErrorResponses() throws Exception {
         // Non-existent record PUT -> 404 "Record not found"
-        mockMvc.perform(put("/api/resource-center/region-state/999999")
+        mockMvc.perform(authPut("/api/resource-center/region-state/999999")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("regionName", "Ghost"))))
                 .andExpect(status().isNotFound())
@@ -294,18 +327,18 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Record not found"));
 
         // Non-existent record DELETE -> 404 "Record not found"
-        mockMvc.perform(delete("/api/resource-center/region-state/999999"))
+        mockMvc.perform(authDelete("/api/resource-center/region-state/999999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Record not found"));
 
         // Invalid ID format (non-numeric) -> 400 "Invalid ID format"
-        mockMvc.perform(delete("/api/resource-center/region-state/abc"))
+        mockMvc.perform(authDelete("/api/resource-center/region-state/abc"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Invalid ID format"));
 
         // Invalid ID format (<= 0) -> 400 "Invalid ID format"
-        mockMvc.perform(delete("/api/resource-center/region-state/0"))
+        mockMvc.perform(authDelete("/api/resource-center/region-state/0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Invalid ID format"));
     }
@@ -319,7 +352,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "ctu_charges_rs_per_kwh", "₹ 0.45"
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/ctu-charges")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/ctu-charges")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -334,13 +367,13 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data[?(@.id == " + id + ")].ctu_charges_rs_per_kwh").value(0.45));
 
         // Update with alternate property "charge" and "rs." prefix
-        mockMvc.perform(put("/api/resource-center/ctu-charges/" + id)
+        mockMvc.perform(authPut("/api/resource-center/ctu-charges/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("charge", "rs. 0.52"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.ctu_charges_rs_per_kwh").value(0.52));
 
-        mockMvc.perform(delete("/api/resource-center/ctu-charges/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/ctu-charges/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -358,7 +391,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "additionalCharge", "rs. 0.15"
         );
 
-        MvcResult result = mockMvc.perform(post("/api/resource-center/state-charges")
+        MvcResult result = mockMvc.perform(authPost("/api/resource-center/state-charges")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
@@ -370,7 +403,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
         int id = objectMapper.readTree(result.getResponse().getContentAsString()).get("data").get("id").asInt();
 
-        mockMvc.perform(delete("/api/resource-center/state-charges/" + id))
+        mockMvc.perform(authDelete("/api/resource-center/state-charges/" + id))
                 .andExpect(status().isOk());
     }
 
@@ -382,7 +415,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "stateCode", "DUP_TEST"
         );
 
-        MvcResult result1 = mockMvc.perform(post("/api/resource-center/region-state")
+        MvcResult result1 = mockMvc.perform(authPost("/api/resource-center/region-state")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload1)))
                 .andExpect(status().isCreated())
@@ -392,14 +425,14 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
 
         try {
             // Posting identical stateCode should trigger unique index violation -> 409 Conflict
-            mockMvc.perform(post("/api/resource-center/region-state")
+            mockMvc.perform(authPost("/api/resource-center/region-state")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(payload1)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.success").value(false))
                     .andExpect(jsonPath("$.message").value("Record already exists (Duplicate Conflict)"));
         } finally {
-            mockMvc.perform(delete("/api/resource-center/region-state/" + id1))
+            mockMvc.perform(authDelete("/api/resource-center/region-state/" + id1))
                     .andExpect(status().isOk());
         }
     }
@@ -408,27 +441,27 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
     @DisplayName("RC-12: Domain validation checks required fields, month format, and numerical bounds")
     void testValidationErrors() throws Exception {
         // Missing required field -> 400 Bad Request
-        mockMvc.perform(post("/api/resource-center/region-state")
+        mockMvc.perform(authPost("/api/resource-center/region-state")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("regionName", "North"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation error: stateName is required"));
 
         // Invalid month format -> 400 Bad Request
-        mockMvc.perform(post("/api/resource-center/iex-fees")
+        mockMvc.perform(authPost("/api/resource-center/iex-fees")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("month", 13, "exchangeFees", 0.02))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation error: month must be between 1 and 12, or in YYYYMM format"));
 
-        mockMvc.perform(post("/api/resource-center/iex-fees")
+        mockMvc.perform(authPost("/api/resource-center/iex-fees")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("month", "invalid_month", "exchangeFees", 0.02))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation error: month must be a number or a valid month name"));
 
         // Negative number check on istsLossPercent -> 400 Bad Request
-        mockMvc.perform(post("/api/resource-center/ists-charges")
+        mockMvc.perform(authPost("/api/resource-center/ists-charges")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "startDate", "2027-01-01",
@@ -439,7 +472,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Validation error: istsLossPercent cannot be negative"));
 
         // Percentage > 100 on istsLossPercent -> 400 Bad Request
-        mockMvc.perform(post("/api/resource-center/ists-charges")
+        mockMvc.perform(authPost("/api/resource-center/ists-charges")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "startDate", "2027-01-01",
@@ -450,7 +483,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Validation error: istsLossPercent cannot exceed 100"));
 
         // Negative fppaChargePercent is explicitly permitted -> 201 Created
-        MvcResult fppaRes = mockMvc.perform(post("/api/resource-center/fppa-charges")
+        MvcResult fppaRes = mockMvc.perform(authPost("/api/resource-center/fppa-charges")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                     "state", "West Bengal",
@@ -462,7 +495,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 .andReturn();
 
         int fppaId = objectMapper.readTree(fppaRes.getResponse().getContentAsString()).get("data").get("id").asInt();
-        mockMvc.perform(delete("/api/resource-center/fppa-charges/" + fppaId))
+        mockMvc.perform(authDelete("/api/resource-center/fppa-charges/" + fppaId))
                 .andExpect(status().isOk());
     }
 
@@ -476,7 +509,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             "stateCode", "DL"
         );
 
-        MvcResult createRes = mockMvc.perform(post("/api/resource-center/discom-list")
+        MvcResult createRes = mockMvc.perform(authPost("/api/resource-center/discom-list")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(initialPayload)))
                 .andExpect(status().isCreated())
@@ -491,7 +524,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                 Map.of("code", "DISCOM_UP2", "legalName", "Discom New In Bulk", "stateCode", "HR")
             );
 
-            MvcResult bulkRes = mockMvc.perform(post("/api/resource-center/discom-list/bulk")
+            MvcResult bulkRes = mockMvc.perform(authPost("/api/resource-center/discom-list/bulk")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(bulkPayload)))
                     .andExpect(status().isCreated())
@@ -511,11 +544,11 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.data[?(@.id == " + id2 + ")].legalName").value("Discom New In Bulk"));
 
             // Cleanup id2
-            mockMvc.perform(delete("/api/resource-center/discom-list/" + id2))
+            mockMvc.perform(authDelete("/api/resource-center/discom-list/" + id2))
                     .andExpect(status().isOk());
         } finally {
             // Cleanup id1
-            mockMvc.perform(delete("/api/resource-center/discom-list/" + id1))
+            mockMvc.perform(authDelete("/api/resource-center/discom-list/" + id1))
                     .andExpect(status().isOk());
         }
     }
@@ -528,7 +561,7 @@ public class ResourceCenterIntegrationTest extends BaseIntegrationTest {
             Map.of("code", "DISCOM_ERR", "stateCode", "DL") // Invalid: missing required legalName
         );
 
-        mockMvc.perform(post("/api/resource-center/discom-list/bulk")
+        mockMvc.perform(authPost("/api/resource-center/discom-list/bulk")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(failingBulkPayload)))
                 .andExpect(status().isBadRequest())

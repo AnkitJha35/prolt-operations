@@ -81,25 +81,21 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(1)
-    @DisplayName("AUTH-01: Standard Username/Password Login (Success)")
-    void testAuth01_Login_Success() throws Exception {
+    @DisplayName("AUTH-01: Legacy Password Login is Decommissioned (Returns 404)")
+    void testAuth01_Login_Decommissioned() throws Exception {
         TestUserHelper.TestUser loginUser = createTestUser(Role.ADMIN);
         try {
             String payload = String.format("""
                 {
                     "username": "%s",
-                    "password": "%s"
+                    "password": "AnyPassword123!"
                 }
-                """, loginUser.getUser().getUsername(), loginUser.getRawPassword());
+                """, loginUser.getUser().getUsername());
 
             mockMvc.perform(post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(payload))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.token").isString())
-                    .andExpect(jsonPath("$.user.username").value(loginUser.getUser().getUsername()))
-                    .andExpect(jsonPath("$.user.role").value("ADMIN"));
+                    .andExpect(status().isNotFound());
         } finally {
             deleteTestUser(loginUser);
         }
@@ -107,16 +103,16 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(2)
-    @DisplayName("AUTH-01a: Missing username or password returns 400")
-    void testAuth01a_Login_MissingCredentials() throws Exception {
+    @DisplayName("AUTH-01a: Missing email or OTP returns 400 on /api/auth/verify-otp")
+    void testAuth01a_VerifyOtp_MissingCredentials() throws Exception {
         String payload = """
             {
-                "username": "",
-                "password": ""
+                "email": "",
+                "otp": ""
             }
             """;
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/verify-otp")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
                 .andExpect(status().isBadRequest())
@@ -125,23 +121,23 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(3)
-    @DisplayName("AUTH-01b: Invalid credentials returns 401")
-    void testAuth01b_Login_InvalidCredentials() throws Exception {
+    @DisplayName("AUTH-01b: Invalid OTP returns 401 on /api/auth/verify-otp")
+    void testAuth01b_VerifyOtp_InvalidCredentials() throws Exception {
         TestUserHelper.TestUser invalidUser = createTestUser(Role.ADMIN);
         try {
             String payload = String.format("""
                 {
-                    "username": "%s",
-                    "password": "WrongPassword123!"
+                    "email": "%s",
+                    "otp": "000000"
                 }
-                """, invalidUser.getUser().getUsername());
+                """, invalidUser.getUser().getEmail());
 
-            mockMvc.perform(post("/api/auth/login")
+            mockMvc.perform(post("/api/auth/verify-otp")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(payload))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.success").value(false))
-                    .andExpect(jsonPath("$.message").value("Invalid credentials"));
+                    .andExpect(jsonPath("$.message").value("Invalid or expired OTP"));
         } finally {
             deleteTestUser(invalidUser);
         }
@@ -335,7 +331,6 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
                 "username": "%s",
                 "email": "%s",
                 "fullName": "Trader John",
-                "password": "SecurePassword123!",
                 "role": "CLIENT",
                 "hiddenModules": ["trader-performance", "admin-settings"],
                 "readOnlyModules": ["savings-calculator"]
@@ -404,7 +399,6 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
                 "username": "intruder_user",
                 "email": "intruder@probus.io",
                 "fullName": "Intruder User",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """;
@@ -430,7 +424,6 @@ public class AuthAndUserIntegrationTest extends BaseIntegrationTest {
                     "username": "%s",
                     "email": "%s",
                     "fullName": "Duplicate User",
-                    "password": "Password123!",
                     "role": "ADMIN"
                 }
                 """, dupUser.getUser().getUsername(), dupUser.getUser().getEmail());

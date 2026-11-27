@@ -37,9 +37,6 @@ public class RepositoryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private SavingsCalculatorEntryRepository savingsCalculatorEntryRepository;
 
-    @Autowired
-    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-
     @Test
     void testFreshFlywayMigrationLeavesZeroRowsInUserTable() {
         String freshDbName = "fresh_flyway_test_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
@@ -86,7 +83,6 @@ public class RepositoryIntegrationTest extends BaseIntegrationTest {
         User user = User.create();
         user.setUsername(testUsername);
         user.setEmail(testUsername + "@probus.io");
-        user.setPasswordHash(passwordEncoder.encode("TestCrudUserPass123!"));
         user.setRole(Role.CLIENT);
         user.setFullName("Test CRUD User");
         user.setCreatedAt(LocalDateTime.now());

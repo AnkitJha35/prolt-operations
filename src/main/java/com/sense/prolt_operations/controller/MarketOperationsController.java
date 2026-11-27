@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sense.prolt_operations.dto.response.ApiResponse;
 import com.sense.prolt_operations.service.MarketOperationsService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,14 +28,11 @@ public class MarketOperationsController {
 
     @GetMapping
     @Operation(summary = "Get Market Operations Records", description = "Retrieves aligned interval MCP comparison across DAM, RTM, and GDAM")
-    public ResponseEntity<Map<String, Object>> getRecords(
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getRecords(
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate) {
 
         List<Map<String, Object>> data = marketOperationsService.getRecords(startDate, endDate);
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "data", data
-        ));
+        return ResponseEntity.ok(ApiResponse.ok(data));
     }
 }

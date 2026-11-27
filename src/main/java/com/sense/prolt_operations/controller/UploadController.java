@@ -35,7 +35,7 @@ public class UploadController {
 
     @PostMapping(consumes = {"multipart/form-data"})
     @Operation(summary = "Upload market dataset file", description = "Uploads and persists DAM, GDAM, RTM, or REC dataset")
-    public ResponseEntity<Map<String, Object>> uploadFile(
+    public ResponseEntity<com.sense.prolt_operations.dto.response.UploadFileResponse> uploadFile(
             @RequestParam(value = "file", required = false) MultipartFile file,
             @RequestParam(value = "market", required = false) String market,
             @RequestParam(value = "deliveryDate", required = false) String deliveryDate,
@@ -79,24 +79,25 @@ public class UploadController {
 
         Map<String, Object> result = uploadProcessingService.processUpload(market, parsedDate, file, action);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("datasetId", result.get("datasetId"));
-        response.put("market", market.trim().toUpperCase());
-        response.put("deliveryDate", targetDateStr);
-        response.put("fileName", file.getOriginalFilename());
-        response.put("rowCount", result.get("rowCount"));
-        response.put("parsed", result.get("parsed"));
+        com.sense.prolt_operations.dto.response.UploadFileResponse response = new com.sense.prolt_operations.dto.response.UploadFileResponse(
+            true,
+            result.get("datasetId"),
+            market.trim().toUpperCase(),
+            targetDateStr,
+            file.getOriginalFilename(),
+            result.get("rowCount"),
+            result.get("parsed")
+        );
 
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/health")
     @Operation(summary = "Upload storage health check", description = "Verifies upload subsystem storage availability")
-    public ResponseEntity<Map<String, Object>> getUploadHealth() {
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "storage", "healthy"
+    public ResponseEntity<com.sense.prolt_operations.dto.response.UploadHealthResponse> getUploadHealth() {
+        return ResponseEntity.ok(new com.sense.prolt_operations.dto.response.UploadHealthResponse(
+            true,
+            "healthy"
         ));
     }
 }

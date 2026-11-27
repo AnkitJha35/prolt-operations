@@ -24,17 +24,17 @@ public class HealthController {
 
     @GetMapping("/health")
     @Operation(summary = "Liveness probe", description = "Returns server health status")
-    public ResponseEntity<Map<String, Object>> health() {
-        return ResponseEntity.ok(Map.of("success", true, "status", "healthy"));
+    public ResponseEntity<com.sense.prolt_operations.dto.response.HealthResponse> health() {
+        return ResponseEntity.ok(new com.sense.prolt_operations.dto.response.HealthResponse(true, "healthy"));
     }
 
     @GetMapping("/health/database")
     @Operation(summary = "Database readiness probe", description = "Checks database connectivity")
-    public ResponseEntity<Map<String, Object>> healthDatabase() throws Exception {
+    public ResponseEntity<com.sense.prolt_operations.dto.response.DatabaseHealthResponse> healthDatabase() throws Exception {
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("SELECT 1");
-            return ResponseEntity.ok(Map.of("success", true, "database", "connected"));
+            return ResponseEntity.ok(new com.sense.prolt_operations.dto.response.DatabaseHealthResponse(true, "connected"));
         }
     }
 }

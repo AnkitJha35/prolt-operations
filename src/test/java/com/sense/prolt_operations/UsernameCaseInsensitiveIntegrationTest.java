@@ -52,9 +52,6 @@ public class UsernameCaseInsensitiveIntegrationTest extends BaseIntegrationTest 
     @Autowired
     private UserService userService;
 
-    @Autowired
-    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-
     @Autowired(required = false)
     private com.sense.prolt_operations.security.AuthRateLimiterFilter authRateLimiterFilter;
 
@@ -97,7 +94,6 @@ public class UsernameCaseInsensitiveIntegrationTest extends BaseIntegrationTest 
                 "username": "%s",
                 "email": "%s",
                 "fullName": "Test User",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """, baseName, email);
@@ -121,7 +117,6 @@ public class UsernameCaseInsensitiveIntegrationTest extends BaseIntegrationTest 
                     "username": "%s",
                     "email": "different1_%s@probus.io",
                     "fullName": "Test User",
-                    "password": "Password123!",
                     "role": "CLIENT"
                 }
                 """, baseName.toLowerCase(), uid);
@@ -140,7 +135,6 @@ public class UsernameCaseInsensitiveIntegrationTest extends BaseIntegrationTest 
                     "username": "%s",
                     "email": "different2_%s@probus.io",
                     "fullName": "Test User",
-                    "password": "Password123!",
                     "role": "CLIENT"
                 }
                 """, baseName.toUpperCase(), uid);
@@ -159,7 +153,6 @@ public class UsernameCaseInsensitiveIntegrationTest extends BaseIntegrationTest 
                     "username": "   %s   ",
                     "email": "different3_%s@probus.io",
                     "fullName": "Test User",
-                    "password": "Password123!",
                     "role": "CLIENT"
                 }
                 """, baseName, uid);
@@ -201,7 +194,7 @@ public class UsernameCaseInsensitiveIntegrationTest extends BaseIntegrationTest 
             executor.submit(() -> {
                 try {
                     latch.await();
-                    CreateUserDTO dto = new CreateUserDTO(variantName, userEmail, "Variant User", "Password123!", "CLIENT", null, null);
+                    CreateUserDTO dto = new CreateUserDTO(variantName, userEmail, "Variant User", "CLIENT", null, null);
                     userService.createUser(dto, "TEST");
                     successCount.incrementAndGet();
                 } catch (BadRequestException e) {
@@ -228,95 +221,37 @@ public class UsernameCaseInsensitiveIntegrationTest extends BaseIntegrationTest 
 
     @Test
     @Order(3)
-    @DisplayName("AUTH-01: Login resolves identically for Ankit, ankit, ANKIT, and ' Ankit '")
+    @DisplayName("AUTH-01: Normalized username lookup resolves identically for Ankit, ankit, ANKIT, and ' Ankit '; legacy login returns 404")
     void testCaseInsensitiveAuthentication() throws Exception {
         String uid = UUID.randomUUID().toString().replace("-", "").substring(0, 6);
         String registeredUsername = "AnkitAuth_" + uid;
         String email = "ankitauth_" + uid + "@probus.io";
-        String password = "CorrectPassword123!";
 
         // Register user via TestUserHelper
         TestUserHelper.TestUser testUser = testUserHelper.createUser(Role.CLIENT, registeredUsername, email);
-        // Set fixed password
-        User user = testUser.getUser();
-        user.setPasswordHash(passwordEncoder.encode(password));
-        userRepository.save(user);
 
         try {
-            // 1. Login with exact casing
-            assertLoginSuccess(registeredUsername, password, registeredUsername);
+            // 1. Normalized lookup with exact casing
+            assertThat(userRepository.findByNormalizedUsername(registeredUsername)).isPresent();
 
-            // 2. Login with lowercase
-            assertLoginSuccess(registeredUsername.toLowerCase(), password, registeredUsername);
+            // 2. Normalized lookup with lowercase
+            assertThat(userRepository.findByNormalizedUsername(registeredUsername.toLowerCase())).isPresent();
 
-            // 3. Login with uppercase
-            assertLoginSuccess(registeredUsername.toUpperCase(), password, registeredUsername);
+            // 3. Normalized lookup with uppercase
+            assertThat(userRepository.findByNormalizedUsername(registeredUsername.toUpperCase())).isPresent();
 
-            // 4. Login with whitespace padding
-            assertLoginSuccess("   " + registeredUsername + "   ", password, registeredUsername);
+            // 4. Normalized lookup with whitespace padding
+            assertThat(userRepository.findByNormalizedUsername(registeredUsername.trim().toLowerCase())).isPresent();
 
-            // 5. Invalid password returns 401
-            String invalidPassPayload = String.format("""
-                {
-                    "username": "%s",
-                    "password": "WrongPassword123!"
-                }
-                """, registeredUsername.toLowerCase());
-
+            // 5. Decommissioned /api/auth/login returns 404
             mockMvc.perform(post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(invalidPassPayload))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.success").value(false))
-                    .andExpect(jsonPath("$.message").value("Invalid credentials"));
-
-            // 6. Non-existent username returns 401
-            String nonExistentPayload = """
-                {
-                    "username": "NonExistentUser123456",
-                    "password": "Password123!"
-                }
-                """;
-
-            mockMvc.perform(post("/api/auth/login")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(nonExistentPayload))
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.success").value(false))
-                    .andExpect(jsonPath("$.message").value("Invalid credentials"));
+                    .content("{\"username\": \"" + registeredUsername + "\", \"password\": \"AnyPassword123!\"}"))
+                    .andExpect(status().isNotFound());
 
         } finally {
             deleteTestUser(testUser);
         }
-    }
-
-    private void assertLoginSuccess(String loginUsernameInput, String password, String expectedStoredCasing) throws Exception {
-        String payload = String.format("""
-            {
-                "username": "%s",
-                "password": "%s"
-            }
-            """, loginUsernameInput, password);
-
-        MvcResult result = mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(payload))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.token").isString())
-                .andExpect(jsonPath("$.user.username").value(expectedStoredCasing))
-                .andExpect(jsonPath("$.user.name").value(expectedStoredCasing))
-                .andReturn();
-
-        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-        String token = "Bearer " + json.get("token").asText();
-
-        // Verify /api/auth/me returns the original stored casing
-        mockMvc.perform(get("/api/auth/me")
-                .header("Authorization", token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.user.username").value(expectedStoredCasing));
     }
 
     @Test

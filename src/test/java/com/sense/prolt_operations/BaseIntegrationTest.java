@@ -37,11 +37,12 @@ public abstract class BaseIntegrationTest {
         registry.add("management.health.redis.enabled", () -> "false");
         registry.add("management.health.mail.enabled", () -> "false");
         registry.add("app.jwt.secret", () -> "super_secret_jwt_key_for_testing_purposes_at_least_32_bytes!");
+        registry.add("app.rate-limit.account-hmac-key", () -> "test_rate_limit_hmac_key_for_testing_purposes_v18n!");
         registry.add("app.starrocks.host", () -> "");
         registry.add("app.webhook-secret", () -> "test_webhook_secret_key");
         registry.add("spring.data.redis.url", () -> "redis://localhost:6379");
         registry.add("app.redis-url", () -> "redis://localhost:6379");
-        registry.add("spring.flyway.target", () -> "8");
+        registry.add("spring.flyway.target", () -> System.getProperty("test.flyway.target", "14"));
         registry.add("management.endpoints.web.exposure.include", () -> "health,info,prometheus");
         registry.add("management.prometheus.metrics.export.enabled", () -> "true");
     }

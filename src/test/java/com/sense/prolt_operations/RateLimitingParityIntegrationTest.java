@@ -93,26 +93,26 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
 
         for (int i = 1; i <= 10; i++) {
             int expectedRemaining = 10 - i;
-            mockMvc.perform(post("/api/auth/login")
+            mockMvc.perform(post("/api/auth/send-otp")
                             .with(request -> {
                                 request.setRemoteAddr(testIp);
                                 return request;
                             })
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"email\":\"wrong@probus.io\",\"password\":\"badpass\"}"))
+                            .content("{\"email\":\"wrong@probus.io\"}"))
                     .andExpect(header().string("RateLimit-Limit", "10"))
                     .andExpect(header().string("RateLimit-Remaining", String.valueOf(expectedRemaining)))
                     .andExpect(header().exists("RateLimit-Reset"));
         }
 
         // 11th request must return 429
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/send-otp")
                         .with(request -> {
                             request.setRemoteAddr(testIp);
                             return request;
                         })
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"wrong@probus.io\",\"password\":\"badpass\"}"))
+                        .content("{\"email\":\"wrong@probus.io\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string("RateLimit-Limit", "10"))
                 .andExpect(header().string("RateLimit-Remaining", "0"))
@@ -128,59 +128,48 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
         String testIp = "203.0.113.20";
 
         for (int i = 0; i < 10; i++) {
-            mockMvc.perform(post("/api/auth/login")
+            mockMvc.perform(post("/api/auth/send-otp")
                     .with(request -> {
                         request.setRemoteAddr(testIp);
                         return request;
                     })
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"email\":\"wrong@probus.io\",\"password\":\"badpass\"}"));
+                    .content("{\"email\":\"wrong@probus.io\"}"));
         }
 
         // Exceeded
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/send-otp")
                         .with(request -> {
                             request.setRemoteAddr(testIp);
                             return request;
                         })
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"wrong@probus.io\",\"password\":\"badpass\"}"))
+                        .content("{\"email\":\"wrong@probus.io\"}"))
                 .andExpect(status().isTooManyRequests());
 
         // Advance clock by 15 minutes and 1 second
         testClock.advance(Duration.ofMinutes(15).plusSeconds(1));
 
         // Window should have reset: request succeeds (not 429) and remaining is 9
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/send-otp")
                         .with(request -> {
                             request.setRemoteAddr(testIp);
                             return request;
                         })
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"wrong@probus.io\",\"password\":\"badpass\"}"))
+                        .content("{\"email\":\"wrong@probus.io\"}"))
                 .andExpect(header().string("RateLimit-Limit", "10"))
                 .andExpect(header().string("RateLimit-Remaining", "9"))
-                .andExpect(status().isUnauthorized()); // 401 invalid credentials, not 429!
+                .andExpect(status().isNotFound()); // User not found, but rate limiter allowed it through!
     }
 
     @Test
-    @DisplayName("Auth limiter: Shared counter across POST /login, /send-otp, and /verify-otp")
+    @DisplayName("Auth limiter: Shared counter across POST /send-otp and /verify-otp")
     void sharedCounterAcrossAllAuthEndpoints() throws Exception {
         String testIp = "203.0.113.30";
 
-        // 4 requests to /login
-        for (int i = 0; i < 4; i++) {
-            mockMvc.perform(post("/api/auth/login")
-                    .with(request -> {
-                        request.setRemoteAddr(testIp);
-                        return request;
-                    })
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"email\":\"u@p.io\",\"password\":\"p\"}"));
-        }
-
-        // 3 requests to /send-otp
-        for (int i = 0; i < 3; i++) {
+        // 5 requests to /send-otp
+        for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/auth/send-otp")
                     .with(request -> {
                         request.setRemoteAddr(testIp);
@@ -190,8 +179,8 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
                     .content("{\"email\":\"u@p.io\"}"));
         }
 
-        // 3 requests to /verify-otp
-        for (int i = 0; i < 3; i++) {
+        // 5 requests to /verify-otp
+        for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/auth/verify-otp")
                     .with(request -> {
                         request.setRemoteAddr(testIp);
@@ -201,14 +190,14 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
                     .content("{\"email\":\"u@p.io\",\"otp\":\"123456\"}"));
         }
 
-        // Total 10 requests consumed across all 3 routes. 11th request to /login must return 429
-        mockMvc.perform(post("/api/auth/login")
+        // Total 10 requests consumed across both routes. 11th request to /send-otp must return 429
+        mockMvc.perform(post("/api/auth/send-otp")
                         .with(request -> {
                             request.setRemoteAddr(testIp);
                             return request;
                         })
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"u@p.io\",\"password\":\"p\"}"))
+                        .content("{\"email\":\"u@p.io\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.message", is("Too many login attempts, please try again after 15 minutes")));
     }
@@ -221,34 +210,34 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
 
         // Exhaust IP 1
         for (int i = 0; i < 10; i++) {
-            mockMvc.perform(post("/api/auth/login")
+            mockMvc.perform(post("/api/auth/send-otp")
                     .with(request -> {
                         request.setRemoteAddr(ip1);
                         return request;
                     })
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"email\":\"u@p.io\",\"password\":\"p\"}"));
+                    .content("{\"email\":\"u@p.io\"}"));
         }
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/send-otp")
                         .with(request -> {
                             request.setRemoteAddr(ip1);
                             return request;
                         })
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"u@p.io\",\"password\":\"p\"}"))
+                        .content("{\"email\":\"u@p.io\"}"))
                 .andExpect(status().isTooManyRequests());
 
         // IP 2 is completely unaffected
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/send-otp")
                         .with(request -> {
                             request.setRemoteAddr(ip2);
                             return request;
                         })
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"u@p.io\",\"password\":\"p\"}"))
+                        .content("{\"email\":\"u@p.io\"}"))
                 .andExpect(header().string("RateLimit-Remaining", "9"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -259,18 +248,18 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
         // Attacker rotates spoofed IP in the first position of X-Forwarded-For
         for (int i = 1; i <= 10; i++) {
             String spoofedHeader = "10.0.0." + i + ", " + realClientIp;
-            mockMvc.perform(post("/api/auth/login")
+            mockMvc.perform(post("/api/auth/send-otp")
                     .header("X-Forwarded-For", spoofedHeader)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"email\":\"u@p.io\",\"password\":\"p\"}"));
+                    .content("{\"email\":\"u@p.io\"}"));
         }
 
         // 11th request with yet another spoofed IP in first position
         String spoofedHeader11 = "10.0.0.99, " + realClientIp;
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/auth/send-otp")
                         .header("X-Forwarded-For", spoofedHeader11)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"u@p.io\",\"password\":\"p\"}"))
+                        .content("{\"email\":\"u@p.io\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.message", is("Too many login attempts, please try again after 15 minutes")));
     }
@@ -279,7 +268,9 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
     @DisplayName("Upload limiter: 30 requests succeed, 31st returns 429; GET /health is not limited")
     void uploadLimiterParity() throws Exception {
         String testIp = "203.0.113.88";
-        String token = "Bearer " + jwtService.generateToken("uploader-id", "uploader", "uploader@probus.io", com.sense.prolt_operations.entity.Role.ADMIN, java.util.List.of(), java.util.List.of());
+        var uploader = createTestUser(com.sense.prolt_operations.entity.Role.ADMIN, "uploader_rl", "uploader_rl@probus.io");
+        try {
+            String token = uploader.getBearerToken();
 
         for (int i = 1; i <= 30; i++) {
             mockMvc.perform(post("/api/uploads")
@@ -314,5 +305,8 @@ class RateLimitingParityIntegrationTest extends BaseIntegrationTest {
                         }))
                 .andExpect(status().isOk())
                 .andExpect(header().doesNotExist("RateLimit-Limit"));
+        } finally {
+            deleteTestUser(uploader);
+        }
     }
 }

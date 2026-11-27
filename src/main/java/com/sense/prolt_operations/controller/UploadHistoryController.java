@@ -22,10 +22,7 @@ public class UploadHistoryController {
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getUploadHistory(@RequestParam Map<String, String> query) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.putAll(datasetService.getUploadHistory(query));
-        return ResponseEntity.ok(result);
+    public ResponseEntity<com.sense.prolt_operations.dto.response.PaginatedResponse<com.sense.prolt_operations.dto.response.UploadHistoryDTO>> getUploadHistory(@RequestParam Map<String, String> query) {
+        return ResponseEntity.ok(datasetService.getUploadHistory(query));
     }
 }

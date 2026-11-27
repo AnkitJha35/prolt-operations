@@ -34,6 +34,12 @@ import com.sense.prolt_operations.repository.GdamRecordRepository;
 import com.sense.prolt_operations.repository.RtmRecordRepository;
 import com.sense.prolt_operations.repository.UploadHistoryRepository;
 
+import com.sense.prolt_operations.dto.response.DatasetDTO;
+import com.sense.prolt_operations.dto.response.DatasetSummaryResponse;
+import com.sense.prolt_operations.dto.response.PaginatedResponse;
+import com.sense.prolt_operations.dto.response.TimeseriesRecordDTO;
+import com.sense.prolt_operations.dto.response.TimeseriesResponse;
+import com.sense.prolt_operations.dto.response.UploadHistoryDTO;
 import jakarta.persistence.criteria.Predicate;
 
 @Service
@@ -64,7 +70,7 @@ public class DatasetService {
         this.rtmRecordRepository = rtmRecordRepository;
     }
 
-    public Map<String, Object> getDatasets(Map<String, String> query) {
+    public PaginatedResponse<DatasetDTO> getDatasets(Map<String, String> query) {
         int page = parseInt(query.get("page"), 1);
         int limit = parseInt(query.get("limit"), 20);
         String sortBy = query.getOrDefault("sortBy", "deliveryDate");
@@ -97,19 +103,14 @@ public class DatasetService {
         };
 
         Page<Dataset> resultPage = datasetRepository.findAll(spec, pageable);
+        List<DatasetDTO> dtos = resultPage.getContent().stream()
+                .map(DatasetDTO::fromEntity)
+                .toList();
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("data", resultPage.getContent());
-        response.put("meta", Map.of(
-            "page", page,
-            "limit", limit,
-            "total", resultPage.getTotalElements(),
-            "totalPages", resultPage.getTotalPages()
-        ));
-        return response;
+        return PaginatedResponse.of(dtos, page, limit, resultPage.getTotalElements(), resultPage.getTotalPages());
     }
 
-    public Map<String, Object> getSummary() {
+    public DatasetSummaryResponse getSummary() {
         long total = datasetRepository.count();
         long active = datasetRepository.countByStatus(DatasetStatus.ACTIVE);
         long replaced = datasetRepository.countByStatus(DatasetStatus.REPLACED);
@@ -117,22 +118,23 @@ public class DatasetService {
         long historyTotal = uploadHistoryRepository.count();
         var latest = uploadHistoryRepository.findFirstByOrderByTimestampDesc();
 
-        Map<String, Object> summary = new HashMap<>();
-        summary.put("totalDatasets", total);
-        summary.put("activeDatasets", active);
-        summary.put("replacedDatasets", replaced);
-        summary.put("deletedDatasets", deleted);
-        summary.put("totalUploadHistoryRecords", historyTotal);
-        summary.put("latestUploadTimestamp", latest.map(UploadHistory::getTimestamp).orElse(null));
-        return summary;
+        return new DatasetSummaryResponse(
+            total,
+            active,
+            replaced,
+            deleted,
+            historyTotal,
+            latest.map(UploadHistory::getTimestamp).orElse(null)
+        );
     }
 
-    public Dataset getDatasetById(String id) {
-        return datasetRepository.findById(id)
+    public DatasetDTO getDatasetById(String id) {
+        Dataset dataset = datasetRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Dataset not found"));
+        return DatasetDTO.fromEntity(dataset);
     }
 
-    public Map<String, Object> getUploadHistory(Map<String, String> query) {
+    public PaginatedResponse<UploadHistoryDTO> getUploadHistory(Map<String, String> query) {
         int page = parseInt(query.get("page"), 1);
         int limit = parseInt(query.get("limit"), 20);
         String sortBy = query.getOrDefault("sortBy", "timestamp");
@@ -155,23 +157,21 @@ public class DatasetService {
         };
 
         Page<UploadHistory> resultPage = uploadHistoryRepository.findAll(spec, pageable);
+        List<UploadHistoryDTO> dtos = resultPage.getContent().stream()
+                .map(UploadHistoryDTO::fromEntity)
+                .toList();
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("data", resultPage.getContent());
-        response.put("meta", Map.of(
-            "page", page,
-            "limit", limit,
-            "total", resultPage.getTotalElements(),
-            "totalPages", resultPage.getTotalPages()
-        ));
-        return response;
+        return PaginatedResponse.of(dtos, page, limit, resultPage.getTotalElements(), resultPage.getTotalPages());
     }
 
-    public List<UploadHistory> getDatasetHistory(String datasetId) {
-        return uploadHistoryRepository.findByDatasetIdOrderByTimestampAsc(datasetId);
+    public List<UploadHistoryDTO> getDatasetHistory(String datasetId) {
+        return uploadHistoryRepository.findByDatasetIdOrderByTimestampAsc(datasetId)
+                .stream()
+                .map(UploadHistoryDTO::fromEntity)
+                .toList();
     }
 
-    public Map<String, Object> getTimeseries(String dateStr, String marketStr) {
+    public TimeseriesResponse getTimeseries(String dateStr, String marketStr) {
         if (marketStr == null || (!marketStr.equalsIgnoreCase("DAM") &&
                                   !marketStr.equalsIgnoreCase("GDAM") &&
                                   !marketStr.equalsIgnoreCase("RTM"))) {
@@ -193,65 +193,65 @@ public class DatasetService {
         var datasetOpt = datasetRepository.findFirstByMarketAndDeliveryDateAndStatus(market, date, DatasetStatus.ACTIVE);
 
         if (datasetOpt.isEmpty()) {
-            return Map.of("success", true, "data", List.of(), "count", 0);
+            return new TimeseriesResponse(true, List.of(), 0);
         }
 
         Dataset dataset = datasetOpt.get();
-        List<Map<String, Object>> records = new ArrayList<>();
+        List<TimeseriesRecordDTO> records = new ArrayList<>();
 
         if (market == MarketType.DAM) {
             List<DamRecord> list = damRecordRepository.findByDatasetIdOrderByIntervalNumberAsc(dataset.getId());
             for (DamRecord r : list) {
-                records.add(Map.of(
-                    "timeBlock", r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
-                    "time", r.getIntervalTime() != null ? r.getIntervalTime() : "",
-                    "mcp", r.getMcp() != null ? r.getMcp() : 0,
-                    "mcv", r.getMcv() != null ? r.getMcv() : 0,
-                    "purchaseBid", r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
-                    "sellBid", r.getSellBid() != null ? r.getSellBid() : 0
+                records.add(new TimeseriesRecordDTO(
+                    r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
+                    r.getIntervalTime() != null ? r.getIntervalTime() : "",
+                    r.getMcp() != null ? r.getMcp() : 0,
+                    r.getMcv() != null ? r.getMcv() : 0,
+                    r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
+                    r.getSellBid() != null ? r.getSellBid() : 0
                 ));
             }
         } else if (market == MarketType.GDAM) {
             if (date.isBefore(GDAM_TRANSITION_DATE)) {
                 List<GdamRecord> list = gdamRecordRepository.findByDatasetIdOrderByIntervalNumberAsc(dataset.getId());
                 for (GdamRecord r : list) {
-                    records.add(Map.of(
-                        "timeBlock", r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
-                        "time", r.getIntervalTime() != null ? r.getIntervalTime() : "",
-                        "mcp", r.getMcp() != null ? r.getMcp() : 0,
-                        "mcv", r.getMcvTotal() != null ? r.getMcvTotal() : 0,
-                        "purchaseBid", r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
-                        "sellBid", r.getSellBidTotal() != null ? r.getSellBidTotal() : 0
+                    records.add(new TimeseriesRecordDTO(
+                        r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
+                        r.getIntervalTime() != null ? r.getIntervalTime() : "",
+                        r.getMcp() != null ? r.getMcp() : 0,
+                        r.getMcvTotal() != null ? r.getMcvTotal() : 0,
+                        r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
+                        r.getSellBidTotal() != null ? r.getSellBidTotal() : 0
                     ));
                 }
             } else {
                 List<GdamNewRecord> list = gdamNewRecordRepository.findByDatasetIdOrderByIntervalNumberAsc(dataset.getId());
                 for (GdamNewRecord r : list) {
-                    records.add(Map.of(
-                        "timeBlock", r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
-                        "time", r.getIntervalTime() != null ? r.getIntervalTime() : "",
-                        "mcp", r.getMcp() != null ? r.getMcp() : 0,
-                        "mcv", r.getMcvTotal() != null ? r.getMcvTotal() : 0,
-                        "purchaseBid", r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
-                        "sellBid", r.getSellBidTotal() != null ? r.getSellBidTotal() : 0
+                    records.add(new TimeseriesRecordDTO(
+                        r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
+                        r.getIntervalTime() != null ? r.getIntervalTime() : "",
+                        r.getMcp() != null ? r.getMcp() : 0,
+                        r.getMcvTotal() != null ? r.getMcvTotal() : 0,
+                        r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
+                        r.getSellBidTotal() != null ? r.getSellBidTotal() : 0
                     ));
                 }
             }
         } else if (market == MarketType.RTM) {
             List<RtmRecord> list = rtmRecordRepository.findByDatasetIdOrderByIntervalNumberAsc(dataset.getId());
             for (RtmRecord r : list) {
-                records.add(Map.of(
-                    "timeBlock", r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
-                    "time", r.getIntervalTime() != null ? r.getIntervalTime() : "",
-                    "mcp", r.getMcp() != null ? r.getMcp() : 0,
-                    "mcv", r.getMcv() != null ? r.getMcv() : 0,
-                    "purchaseBid", r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
-                    "sellBid", r.getSellBid() != null ? r.getSellBid() : 0
+                records.add(new TimeseriesRecordDTO(
+                    r.getIntervalNumber() != null ? r.getIntervalNumber() : 0,
+                    r.getIntervalTime() != null ? r.getIntervalTime() : "",
+                    r.getMcp() != null ? r.getMcp() : 0,
+                    r.getMcv() != null ? r.getMcv() : 0,
+                    r.getPurchaseBid() != null ? r.getPurchaseBid() : 0,
+                    r.getSellBid() != null ? r.getSellBid() : 0
                 ));
             }
         }
 
-        return Map.of("success", true, "data", records, "count", records.size());
+        return new TimeseriesResponse(true, records, records.size());
     }
 
     private int parseInt(String val, int fallback) {

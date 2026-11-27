@@ -24,7 +24,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.sense.prolt_operations.dto.auth.LoginDTO;
 import com.sense.prolt_operations.entity.Role;
 import com.sense.prolt_operations.exception.AppBaseException;
 import com.sense.prolt_operations.repository.UserRepository;
@@ -48,18 +47,19 @@ class RedisOptionalOperationIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     @Test
-    @DisplayName("REDIS-OPT-01: Password login succeeds without any Redis interaction")
-    void testPasswordLoginWithoutRedis() {
-        TestUserHelper.TestUser testUser = createTestUser(Role.CLIENT);
+    @DisplayName("REDIS-OPT-01: OTP verification via superadmin bypass succeeds without any Redis interaction")
+    void testSuperadminOtpBypassWithoutRedis() {
+        TestUserHelper.TestUser superAdmin = testUserHelper.createOrUpdateSuperAdmin("super.admin@probus.io");
         try {
-            LoginDTO loginDto = new LoginDTO(testUser.getUser().getUsername(), null, testUser.getRawPassword());
-            var authResponse = authService.login(loginDto);
+            otpService.setSuperadminBypassEnabled(true);
+            var verifyDto = new com.sense.prolt_operations.dto.auth.VerifyOtpDTO("super.admin@probus.io", "749261");
+            var authResponse = authService.verifyOtp(verifyDto);
             assertThat(authResponse).isNotNull();
             assertThat(authResponse.success()).isTrue();
             assertThat(authResponse.token()).isNotBlank();
-            assertThat(authResponse.user().email()).isEqualTo(testUser.getUser().getEmail());
+            assertThat(authResponse.user().email()).isEqualTo("super.admin@probus.io");
         } finally {
-            deleteTestUser(testUser);
+            deleteTestUser(superAdmin);
         }
     }
 

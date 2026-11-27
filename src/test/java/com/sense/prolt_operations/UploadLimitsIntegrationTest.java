@@ -111,21 +111,26 @@ class UploadLimitsIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Uploads: Unsupported file extension (.exe) is rejected matching Node multer filter")
     void uploadUnsupportedExtension_rejected() throws Exception {
-        String token = "Bearer " + jwtService.generateToken("uploader-id", "uploader", "uploader@probus.io", Role.ADMIN, List.of(), List.of());
-        MockMultipartFile badExtFile = new MockMultipartFile(
-                "file",
-                "malicious.exe",
-                "application/octet-stream",
-                "binary".getBytes()
-        );
+        var uploader = createTestUser(Role.ADMIN, "uploader", "uploader@probus.io");
+        try {
+            String token = uploader.getBearerToken();
+            MockMultipartFile badExtFile = new MockMultipartFile(
+                    "file",
+                    "malicious.exe",
+                    "application/octet-stream",
+                    "binary".getBytes()
+            );
 
-        mockMvc.perform(multipart("/api/uploads")
-                        .file(badExtFile)
-                        .param("market", "DAM")
-                        .param("deliveryDate", "2026-06-22")
-                        .header("Authorization", token))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success", is(false)))
-                .andExpect(jsonPath("$.message", containsString("Unsupported file extension: .exe")));
+            mockMvc.perform(multipart("/api/uploads")
+                            .file(badExtFile)
+                            .param("market", "DAM")
+                            .param("deliveryDate", "2026-06-22")
+                            .header("Authorization", token))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success", is(false)))
+                    .andExpect(jsonPath("$.message", containsString("Unsupported file extension: .exe")));
+        } finally {
+            deleteTestUser(uploader);
+        }
     }
 }

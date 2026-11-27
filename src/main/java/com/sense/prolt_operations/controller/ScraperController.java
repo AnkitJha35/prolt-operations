@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sense.prolt_operations.config.AppProperties;
 import com.sense.prolt_operations.dto.dataset.PersistDatasetDTO;
+import com.sense.prolt_operations.dto.response.ScraperImportResponse;
+import com.sense.prolt_operations.dto.response.ScraperTriggerResponse;
 import com.sense.prolt_operations.entity.Dataset;
 import com.sense.prolt_operations.entity.DatasetStatus;
 import com.sense.prolt_operations.entity.MarketType;
@@ -67,7 +69,7 @@ public class ScraperController {
     }
 
     @PostMapping("/sync")
-    public ResponseEntity<Map<String, Object>> triggerScraper(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<ScraperTriggerResponse> triggerScraper(@RequestBody Map<String, Object> body) {
         String market = body != null && body.get("market") != null ? body.get("market").toString().trim().toUpperCase() : null;
         if (market == null || (!market.equals("DAM") && !market.equals("GDAM") && !market.equals("RTM") && !market.equals("REC"))) {
             throw new BadRequestException("Invalid market specified. Must be DAM, GDAM, RTM, or REC.");
@@ -113,10 +115,9 @@ public class ScraperController {
                 "SUCCESS",
                 "Successfully scraped and saved " + records.size() + " records for " + market + " (manual trigger)");
 
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Successfully scraped and saved " + records.size() + " records for " + market,
-                "datasetId", dataset.getId()
+            return ResponseEntity.ok(ScraperTriggerResponse.ok(
+                "Successfully scraped and saved " + records.size() + " records for " + market,
+                dataset.getId()
             ));
         } catch (Exception e) {
             log.error("Scraper Controller Error: {}", e.getMessage(), e);
@@ -129,7 +130,7 @@ public class ScraperController {
     }
 
     @PostMapping("/import")
-    public ResponseEntity<?> importScrapedData(
+    public ResponseEntity<ScraperImportResponse> importScrapedData(
             @RequestHeader(value = "x-webhook-token", required = false) String webhookToken,
             @RequestHeader(value = "x-webhook-secret", required = false) String webhookSecret,
             @RequestBody(required = false) Map<String, Object> body) {
@@ -137,12 +138,12 @@ public class ScraperController {
         String providedToken = webhookToken != null && !webhookToken.isBlank() ? webhookToken : webhookSecret;
         if (providedToken == null || !isSecretValid(providedToken, appProperties.getWebhookSecret())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("success", false, "message", "Unauthorized"));
+                    .body(ScraperImportResponse.error("Unauthorized"));
         }
 
         if (body == null || body.isEmpty()) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Missing type or payload"));
+                    .body(ScraperImportResponse.error("Missing type or payload"));
         }
 
         // Direct SCRAPE-01 format: { "market": "DAM", "deliveryDate": "2026-06-21", "records": [...] }
@@ -155,7 +156,7 @@ public class ScraperController {
 
         if (type == null || payloadObj == null) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Missing type or payload"));
+                    .body(ScraperImportResponse.error("Missing type or payload"));
         }
 
         log.info("[Webhook Import] Received event: {}", type);
@@ -167,23 +168,23 @@ public class ScraperController {
                     Map<String, Object> payload = (Map<String, Object>) payloadMap;
                     return handleDirectDatasetImport(payload);
                 }
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid dataset payload"));
+                return ResponseEntity.badRequest().body(ScraperImportResponse.error("Invalid dataset payload"));
             } else if ("state-demand".equalsIgnoreCase(type)) {
                 return handleStateDemandImport(payloadObj);
             } else if ("state-market-records".equalsIgnoreCase(type)) {
                 return handleStateMarketRecordsImport(payloadObj);
             } else {
                 return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "Unknown import event type: " + type));
+                        .body(ScraperImportResponse.error("Unknown import event type: " + type));
             }
         } catch (Exception e) {
             log.error("[Webhook Import Error]: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("success", false, "message", e.getMessage() != null ? e.getMessage() : "Import failed"));
+                    .body(ScraperImportResponse.error(e.getMessage() != null ? e.getMessage() : "Import failed"));
         }
     }
 
-    private ResponseEntity<?> handleDirectDatasetImport(Map<String, Object> payload) {
+    private ResponseEntity<ScraperImportResponse> handleDirectDatasetImport(Map<String, Object> payload) {
         String marketStr = (String) payload.get("market");
         String dateStr = (String) payload.get("deliveryDate");
         String fileName = (String) payload.getOrDefault("fileName", "webhook_" + marketStr + "_" + dateStr + ".csv");
@@ -211,15 +212,14 @@ public class ScraperController {
         Dataset dataset = persistenceService.persistDataset(dto);
         log.info("[Webhook Import] Successfully imported dataset for {} on {}", market, deliveryDate);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("success", true);
-        response.put("message", String.format("Successfully imported %d records for %s %s",
-                records != null ? records.size() : 0, marketStr, dateStr));
-        response.put("datasetId", dataset.getId());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ScraperImportResponse.ok(
+            String.format("Successfully imported %d records for %s %s",
+                records != null ? records.size() : 0, marketStr, dateStr),
+            dataset.getId()
+        ));
     }
 
-    private ResponseEntity<?> handleStateDemandImport(Object payloadObj) {
+    private ResponseEntity<ScraperImportResponse> handleStateDemandImport(Object payloadObj) {
         if (payloadObj instanceof Map<?, ?> payloadMap) {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> records = (List<Map<String, Object>>) payloadMap.get("records");
@@ -243,13 +243,13 @@ public class ScraperController {
                 }
                 stateDemandDataRepository.saveAll(list);
                 log.info("[Webhook Import] Successfully imported {} state-demand records", list.size());
-                return ResponseEntity.ok(Map.of("success", true, "count", list.size()));
+                return ResponseEntity.ok(ScraperImportResponse.ok(list.size()));
             }
         }
-        return ResponseEntity.ok(Map.of("success", true, "count", 0));
+        return ResponseEntity.ok(ScraperImportResponse.ok(0));
     }
 
-    private ResponseEntity<?> handleStateMarketRecordsImport(Object payloadObj) {
+    private ResponseEntity<ScraperImportResponse> handleStateMarketRecordsImport(Object payloadObj) {
         if (payloadObj instanceof Map<?, ?> payloadMap) {
             String marketStr = (String) payloadMap.get("market");
             String area = (String) payloadMap.get("area");
@@ -300,9 +300,9 @@ public class ScraperController {
                 }
             }
             log.info("[Webhook Import] Successfully imported {} state-market-records for {} ({})", successCount, area, market);
-            return ResponseEntity.ok(Map.of("success", true, "count", successCount));
+            return ResponseEntity.ok(ScraperImportResponse.ok(successCount));
         }
-        return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid payload"));
+        return ResponseEntity.badRequest().body(ScraperImportResponse.error("Invalid payload"));
     }
 
     private boolean isSecretValid(String providedToken, String expectedSecret) {

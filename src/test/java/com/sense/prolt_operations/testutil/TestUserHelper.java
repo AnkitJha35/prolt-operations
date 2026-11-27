@@ -2,7 +2,6 @@ package com.sense.prolt_operations.testutil;
 
 import java.util.UUID;
 
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import com.sense.prolt_operations.entity.Role;
@@ -14,14 +13,11 @@ import com.sense.prolt_operations.security.JwtService;
 public class TestUserHelper {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public TestUserHelper(UserRepository userRepository,
-                          PasswordEncoder passwordEncoder,
                           JwtService jwtService) {
         this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
@@ -59,19 +55,22 @@ public class TestUserHelper {
     }
 
     public TestUser createUser(Role role, String username, String email) {
-        String rawPassword = "TestPassword_" + UUID.randomUUID().toString().replace("-", "") + "!";
+        return createUser(role, username, email, true);
+    }
+
+    public TestUser createUser(Role role, String username, String email, boolean enabled) {
         User user = User.create();
         user.setUsername(username);
         user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setFullName(username);
+        user.setEnabled(enabled);
         user.setRole(role);
         user = userRepository.save(user);
         String token = jwtService.generateToken(user);
-        return new TestUser(user, rawPassword, token);
+        return new TestUser(user, null, token);
     }
 
     public TestUser createOrUpdateSuperAdmin(String email) {
-        String rawPassword = "TestSuperAdminPassword_" + UUID.randomUUID().toString().replace("-", "") + "!";
         User user = userRepository.findByEmail(email).orElseGet(() -> {
             User u = User.create();
             u.setUsername("superadmin");
@@ -81,10 +80,9 @@ public class TestUserHelper {
         });
         user.setRole(Role.SUPER_ADMIN);
         user.setFullName("System Administrator");
-        user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user = userRepository.save(user);
         String token = jwtService.generateToken(user);
-        return new TestUser(user, rawPassword, token);
+        return new TestUser(user, null, token);
     }
 
     public void deleteUser(TestUser testUser) {

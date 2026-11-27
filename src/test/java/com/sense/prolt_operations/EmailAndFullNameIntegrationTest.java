@@ -98,7 +98,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                 "username": "%s",
                 "email": "%s",
                 "fullName": "Alice Wonderland",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """, username, baseEmail);
@@ -123,7 +122,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                     "username": "diff1_%s",
                     "email": "%s",
                     "fullName": "Alice Duplicate",
-                    "password": "Password123!",
                     "role": "CLIENT"
                 }
                 """, uid, baseEmail.toLowerCase());
@@ -142,7 +140,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                     "username": "diff2_%s",
                     "email": "%s",
                     "fullName": "Alice Uppercase",
-                    "password": "Password123!",
                     "role": "CLIENT"
                 }
                 """, uid, baseEmail.toUpperCase());
@@ -161,7 +158,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                     "username": "diff3_%s",
                     "email": "   %s   ",
                     "fullName": "Alice Padded",
-                    "password": "Password123!",
                     "role": "CLIENT"
                 }
                 """, uid, baseEmail);
@@ -202,7 +198,7 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
             executor.submit(() -> {
                 try {
                     latch.await();
-                    CreateUserDTO dto = new CreateUserDTO(userName, variantEmail, "Racer User", "Password123!", "CLIENT", null, null);
+                    CreateUserDTO dto = new CreateUserDTO(userName, variantEmail, "Racer User", "CLIENT", null, null);
                     userService.createUser(dto, "TEST");
                     successCount.incrementAndGet();
                 } catch (BadRequestException e) {
@@ -234,29 +230,29 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(3)
-    @DisplayName("EMAIL-03: Case-insensitive email authentication login via /api/auth/login")
+    @DisplayName("EMAIL-03: Case-insensitive email authentication login via OTP and 404 for decommissioned /api/auth/login")
     void testCaseInsensitiveEmailLogin() throws Exception {
         String uid = UUID.randomUUID().toString().replace("-", "").substring(0, 6);
         String registeredUsername = "auth_user_" + uid;
         String registeredEmail = "Auth.User." + uid + "@Probus.IO";
-        String password = "LoginPassword123!";
 
-        // Register user through service
-        CreateUserDTO dto = new CreateUserDTO(registeredUsername, registeredEmail, "Auth User Full", password, "CLIENT", null, null);
+        // Register user through service without password
+        CreateUserDTO dto = new CreateUserDTO(registeredUsername, registeredEmail, "Auth User Full", "CLIENT", null, null);
         userService.createUser(dto, "TEST");
 
         try {
-            // 1. Login with lowercase email
-            String loginLowercase = String.format("""
-                {
-                    "username": "%s",
-                    "password": "%s"
-                }
-                """, registeredEmail.toLowerCase(), password);
-
-            mockMvc.perform(post("/api/auth/login")
+            // 1. Send OTP and verify with lowercase email
+            mockMvc.perform(post("/api/auth/send-otp")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(loginLowercase))
+                    .content(String.format("{\"email\": \"%s\"}", registeredEmail.toLowerCase())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true));
+
+            String otp1 = otpService.getInMemoryStore().get(registeredEmail.toLowerCase()).otp();
+
+            mockMvc.perform(post("/api/auth/verify-otp")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(String.format("{\"email\": \"%s\", \"otp\": \"%s\"}", registeredEmail.toLowerCase(), otp1)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.user.username").value(registeredUsername))
@@ -264,36 +260,43 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.user.fullName").value("Auth User Full"))
                     .andExpect(jsonPath("$.token").isString());
 
-            // 2. Login with uppercase email
-            String loginUppercase = String.format("""
-                {
-                    "username": "%s",
-                    "password": "%s"
-                }
-                """, registeredEmail.toUpperCase(), password);
-
-            mockMvc.perform(post("/api/auth/login")
+            // 2. Send OTP and verify with uppercase email
+            mockMvc.perform(post("/api/auth/send-otp")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(loginUppercase))
+                    .content(String.format("{\"email\": \"%s\"}", registeredEmail.toUpperCase())))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.success").value(true))
-                    .andExpect(jsonPath("$.user.username").value(registeredUsername))
-                    .andExpect(jsonPath("$.user.fullName").value("Auth User Full"));
+                    .andExpect(jsonPath("$.success").value(true));
 
-            // 3. Login with padded email: "  Auth.User.<uid>@Probus.IO  "
-            String loginPadded = String.format("""
-                {
-                    "username": "   %s   ",
-                    "password": "%s"
-                }
-                """, registeredEmail, password);
+            String otp2 = otpService.getInMemoryStore().get(registeredEmail.toLowerCase()).otp();
 
-            mockMvc.perform(post("/api/auth/login")
+            mockMvc.perform(post("/api/auth/verify-otp")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(loginPadded))
+                    .content(String.format("{\"email\": \"%s\", \"otp\": \"%s\"}", registeredEmail.toUpperCase(), otp2)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.user.username").value(registeredUsername));
+
+            // 3. Send OTP and verify with padded email: "  Auth.User.<uid>@Probus.IO  "
+            mockMvc.perform(post("/api/auth/send-otp")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(String.format("{\"email\": \"   %s   \"}", registeredEmail)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true));
+
+            String otp3 = otpService.getInMemoryStore().get(registeredEmail.toLowerCase()).otp();
+
+            mockMvc.perform(post("/api/auth/verify-otp")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(String.format("{\"email\": \"   %s   \", \"otp\": \"%s\"}", registeredEmail, otp3)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.user.username").value(registeredUsername));
+
+            // 4. Verify decommissioned /api/auth/login returns 404 Not Found
+            mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(String.format("{\"username\": \"%s\", \"password\": \"AnyPass123!\"}", registeredEmail)))
+                    .andExpect(status().isNotFound());
 
         } finally {
             userRepository.findByNormalizedUsername(registeredUsername)
@@ -312,8 +315,8 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
         String user2Username = "update_u2_" + uid;
         String user2Email = "user2_" + uid + "@probus.io";
 
-        CreateUserDTO u1 = new CreateUserDTO(user1Username, user1Email, "User One", "Pass12345!", "CLIENT", null, null);
-        CreateUserDTO u2 = new CreateUserDTO(user2Username, user2Email, "User Two", "Pass12345!", "CLIENT", null, null);
+        CreateUserDTO u1 = new CreateUserDTO(user1Username, user1Email, "User One", "CLIENT", null, null);
+        CreateUserDTO u2 = new CreateUserDTO(user2Username, user2Email, "User Two", "CLIENT", null, null);
         var res1 = userService.createUser(u1, "TEST");
         var res2 = userService.createUser(u2, "TEST");
 
@@ -373,7 +376,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
             {
                 "username": "no_name_%s",
                 "email": "no_name_%s@probus.io",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """, uid, uid);
@@ -392,7 +394,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                 "username": "blank_name_%s",
                 "email": "blank_name_%s@probus.io",
                 "fullName": "     ",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """, uid, uid);
@@ -412,7 +413,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                 "username": "long_name_%s",
                 "email": "long_name_%s@probus.io",
                 "fullName": "%s",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """, uid, uid, longName);
@@ -431,7 +431,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                 "username": "padded_name_%s",
                 "email": "padded_name_%s@probus.io",
                 "fullName": "   Johnathan Doe   ",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """, uid, uid);
@@ -457,8 +456,8 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
         String uid = UUID.randomUUID().toString().replace("-", "").substring(0, 6);
 
         // Create 2 users with identical full names (Allowed!)
-        CreateUserDTO u1 = new CreateUserDTO("user_a_" + uid, "usera_" + uid + "@probus.io", "Same Common Name", "Pass12345!", "CLIENT", null, null);
-        CreateUserDTO u2 = new CreateUserDTO("user_b_" + uid, "userb_" + uid + "@probus.io", "Same Common Name", "Pass12345!", "CLIENT", null, null);
+        CreateUserDTO u1 = new CreateUserDTO("user_a_" + uid, "usera_" + uid + "@probus.io", "Same Common Name", "CLIENT", null, null);
+        CreateUserDTO u2 = new CreateUserDTO("user_b_" + uid, "userb_" + uid + "@probus.io", "Same Common Name", "CLIENT", null, null);
         var res1 = userService.createUser(u1, "TEST");
         var res2 = userService.createUser(u2, "TEST");
 
@@ -499,23 +498,22 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
         String legacyUsername = "legacy_user_" + uid;
         String legacyEmail = "legacy_" + uid + "@probus.io";
 
-        // Save directly via repository simulating pre-existing user before V8 migration
+        // Save directly via repository simulating pre-existing user
         User legacy = User.create();
         legacy.setUsername(legacyUsername);
         legacy.setEmail(legacyEmail);
-        legacy.setFullName(null); // Nullable in DB and entity
-        legacy.setPasswordHash("dummy_hash");
+        legacy.setFullName(legacyUsername); // In V10+ fullName is NOT NULL in DB
         legacy.setRole(Role.CLIENT);
         legacy = userRepository.saveAndFlush(legacy);
 
         try {
-            // 1. GET /api/users exposes null fullName, does not crash
+            // 1. GET /api/users exposes fullName, does not crash
             String token = getSuperAdminToken();
             mockMvc.perform(get("/api/users")
                     .header("Authorization", token))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data[?(@.id == '%s')].fullName", legacy.getId())
-                            .value(org.hamcrest.Matchers.contains((Object) null)))
+                            .value(org.hamcrest.Matchers.contains(legacyUsername)))
                     .andExpect(jsonPath("$.data[?(@.id == '%s')].username", legacy.getId())
                             .value(legacyUsername));
 
@@ -524,7 +522,7 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
                     legacy.getId(),
                     legacy.getUsername(),
                     legacy.getEmail(),
-                    legacy.getFullName(),
+                    null,
                     legacy.getRole().name(),
                     java.util.Collections.emptyList(),
                     java.util.Collections.emptyList()
@@ -550,7 +548,6 @@ public class EmailAndFullNameIntegrationTest extends BaseIntegrationTest {
         user.setUsername("otp_test_" + uid);
         user.setEmail(normalizedEmail);
         user.setFullName("OTP User");
-        user.setPasswordHash("dummy_hash");
         user.setRole(Role.CLIENT);
         userRepository.save(user);
 

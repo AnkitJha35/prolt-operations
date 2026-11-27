@@ -80,7 +80,7 @@ public class UsernameImmutabilityIntegrationTest extends BaseIntegrationTest {
 
         assertThat(componentNames)
                 .as("UpdateUserDTO should only define updatable user fields")
-                .containsExactlyInAnyOrder("email", "fullName", "password", "role", "hiddenModules", "readOnlyModules");
+                .containsExactlyInAnyOrder("email", "fullName", "role", "hiddenModules", "readOnlyModules");
     }
 
     @Test
@@ -143,7 +143,6 @@ public class UsernameImmutabilityIntegrationTest extends BaseIntegrationTest {
                 "username": "%s",
                 "email": "%s",
                 "fullName": "Original User",
-                "password": "Password123!",
                 "role": "CLIENT"
             }
             """, initialUsername, initialEmail);
@@ -195,7 +194,7 @@ public class UsernameImmutabilityIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(5)
-    @DisplayName("IMMUT-05: Updating email, role, modules, or password preserves existing username")
+    @DisplayName("IMMUT-05: Updating email, role, or modules preserves existing username")
     void testUsernamePreservedWhenUpdatingOtherFields() throws Exception {
         String token = getSuperAdminToken();
         String uniqueSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
@@ -208,7 +207,6 @@ public class UsernameImmutabilityIntegrationTest extends BaseIntegrationTest {
                 "username": "%s",
                 "email": "%s",
                 "fullName": "Fixed User",
-                "password": "Password123!",
                 "role": "CLIENT",
                 "hiddenModules": ["mod1"],
                 "readOnlyModules": ["mod2"]
@@ -233,8 +231,7 @@ public class UsernameImmutabilityIntegrationTest extends BaseIntegrationTest {
                     "email": "%s",
                     "role": "ADMIN",
                     "hiddenModules": ["mod3", "mod4"],
-                    "readOnlyModules": ["mod5"],
-                    "password": "NewSecretPassword456!"
+                    "readOnlyModules": ["mod5"]
                 }
                 """, newEmail);
 

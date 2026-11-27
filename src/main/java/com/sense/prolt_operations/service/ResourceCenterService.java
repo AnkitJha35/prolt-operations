@@ -504,32 +504,30 @@ public class ResourceCenterService {
     }
 
     private void deleteSingleRecord(String resourceType, Integer id) {
-        String strId = String.valueOf(id);
         switch (resourceType) {
-            case "region-state" -> regionStateRepository.deleteById(strId);
-            case "discom-list" -> discomListRepository.deleteById(strId);
-            case "ists-charges" -> istsChargesRepository.deleteById(strId);
-            case "iex-fees" -> iexFeesRepository.deleteById(strId);
-            case "prolt-margin" -> proltMarginRepository.deleteById(strId);
-            case "ctu-charges" -> ctuChargesRepository.deleteById(strId);
-            case "state-charges" -> stateChargesRepository.deleteById(strId);
-            case "state-tariff" -> stateTariffRepository.deleteById(strId);
-            case "fppa-charges" -> fppaChargesRepository.deleteById(strId);
+            case "region-state" -> regionStateRepository.deleteById(id);
+            case "discom-list" -> discomListRepository.deleteById(id);
+            case "ists-charges" -> istsChargesRepository.deleteById(id);
+            case "iex-fees" -> iexFeesRepository.deleteById(id);
+            case "prolt-margin" -> proltMarginRepository.deleteById(id);
+            case "ctu-charges" -> ctuChargesRepository.deleteById(id);
+            case "state-charges" -> stateChargesRepository.deleteById(id);
+            case "state-tariff" -> stateTariffRepository.deleteById(id);
+            case "fppa-charges" -> fppaChargesRepository.deleteById(id);
         }
     }
 
     private Object findEntityById(String resourceType, Integer id) {
-        String strId = String.valueOf(id);
         return switch (resourceType) {
-            case "region-state" -> regionStateRepository.findById(strId).orElse(null);
-            case "discom-list" -> discomListRepository.findById(strId).orElse(null);
-            case "ists-charges" -> istsChargesRepository.findById(strId).orElse(null);
-            case "iex-fees" -> iexFeesRepository.findById(strId).orElse(null);
-            case "prolt-margin" -> proltMarginRepository.findById(strId).orElse(null);
-            case "ctu-charges" -> ctuChargesRepository.findById(strId).orElse(null);
-            case "state-charges" -> stateChargesRepository.findById(strId).orElse(null);
-            case "state-tariff" -> stateTariffRepository.findById(strId).orElse(null);
-            case "fppa-charges" -> fppaChargesRepository.findById(strId).orElse(null);
+            case "region-state" -> regionStateRepository.findById(id).orElse(null);
+            case "discom-list" -> discomListRepository.findById(id).orElse(null);
+            case "ists-charges" -> istsChargesRepository.findById(id).orElse(null);
+            case "iex-fees" -> iexFeesRepository.findById(id).orElse(null);
+            case "prolt-margin" -> proltMarginRepository.findById(id).orElse(null);
+            case "ctu-charges" -> ctuChargesRepository.findById(id).orElse(null);
+            case "state-charges" -> stateChargesRepository.findById(id).orElse(null);
+            case "state-tariff" -> stateTariffRepository.findById(id).orElse(null);
+            case "fppa-charges" -> fppaChargesRepository.findById(id).orElse(null);
             default -> null;
         };
     }

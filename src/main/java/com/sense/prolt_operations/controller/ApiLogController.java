@@ -27,7 +27,7 @@ public class ApiLogController {
 
     @GetMapping
     @Operation(summary = "Get API Logs", description = "Returns paginated list of API logs with optional date range and apiName filters")
-    public ResponseEntity<Map<String, Object>> getLogs(
+    public ResponseEntity<com.sense.prolt_operations.dto.response.PageResponse<com.sense.prolt_operations.dto.response.ApiLogDTO>> getLogs(
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "limit", defaultValue = "100") int limit,
             @RequestParam(value = "startDate", required = false) String startDate,
@@ -45,7 +45,7 @@ public class ApiLogController {
 
     @GetMapping("/stats")
     @Operation(summary = "Get API Log Statistics", description = "Computes total, success, error counts, and accuracy percentage")
-    public ResponseEntity<Map<String, Object>> getStats(
+    public ResponseEntity<com.sense.prolt_operations.dto.response.ApiLogStatsResponse> getStats(
             @RequestParam(value = "startDate", required = false) String startDate,
             @RequestParam(value = "endDate", required = false) String endDate,
             @RequestParam(value = "apiName", required = false) String apiName) {

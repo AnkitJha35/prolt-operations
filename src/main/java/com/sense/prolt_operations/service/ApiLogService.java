@@ -48,7 +48,7 @@ public class ApiLogService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getLogs(int page, int limit, String startDate, String endDate, String apiName) {
+    public com.sense.prolt_operations.dto.response.PageResponse<com.sense.prolt_operations.dto.response.ApiLogDTO> getLogs(int page, int limit, String startDate, String endDate, String apiName) {
         int pageIndex = Math.max(0, page - 1);
         int pageSize = limit > 0 ? limit : 100;
 
@@ -56,10 +56,23 @@ public class ApiLogService {
         Pageable pageable = PageRequest.of(pageIndex, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<ApiLog> paged = apiLogRepository.findAll(spec, pageable);
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("data", paged.getContent());
-        result.put("total", paged.getTotalElements());
-        return result;
+        List<com.sense.prolt_operations.dto.response.ApiLogDTO> dtos = paged.getContent().stream()
+                .map(l -> new com.sense.prolt_operations.dto.response.ApiLogDTO(
+                        l.getId(),
+                        l.getApiName(),
+                        l.getEndpoint(),
+                        l.getStatus(),
+                        l.getCreatedAt(),
+                        l.getDetails()))
+                .toList();
+
+        return new com.sense.prolt_operations.dto.response.PageResponse<>(
+                dtos,
+                paged.getTotalElements(),
+                page,
+                pageSize,
+                paged.getTotalPages()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +85,7 @@ public class ApiLogService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getStats(String startDate, String endDate, String apiName) {
+    public com.sense.prolt_operations.dto.response.ApiLogStatsResponse getStats(String startDate, String endDate, String apiName) {
         Specification<ApiLog> spec = buildSpec(startDate, endDate, apiName);
         List<ApiLog> logs = apiLogRepository.findAll(spec);
 
@@ -81,11 +94,11 @@ public class ApiLogService {
         long error = total - success;
         double accuracy = total > 0 ? ((double) success / total) * 100.0 : 100.0;
 
-        return Map.of(
-            "total", total,
-            "success", success,
-            "error", error,
-            "accuracy", accuracy
+        return new com.sense.prolt_operations.dto.response.ApiLogStatsResponse(
+            total,
+            success,
+            error,
+            accuracy
         );
     }
 

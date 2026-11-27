@@ -145,6 +145,7 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/resource-center/state-charges")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(chargePayload)))
                 .andExpect(status().isCreated())
@@ -157,6 +158,7 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
     void testResourceCenterBulkRequestBoundaries() throws Exception {
         // Node accepts an empty array and reports that zero records were uploaded.
         mockMvc.perform(post("/api/resource-center/region-state/bulk")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("[]"))
                 .andExpect(status().isCreated())
@@ -167,18 +169,21 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
 
         // Blank rows are filtered before the bulk operation, just as in Node.
         mockMvc.perform(post("/api/resource-center/region-state/bulk")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("[{\"stateName\":\"   \"}, {}]"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("Bulk uploaded 0 records successfully"));
 
         mockMvc.perform(post("/api/resource-center/region-state/bulk")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Payload must be an array of records"));
 
         mockMvc.perform(post("/api/resource-center/not-a-resource/bulk")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isBadRequest())
@@ -211,6 +216,7 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
         );
 
         mockMvc.perform(post("/api/database/city-state")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(cityState)))
                 .andExpect(status().isCreated())
@@ -226,6 +232,7 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
                 """;
 
         mockMvc.perform(post("/api/database/city-state")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
                 .andExpect(status().isCreated())
@@ -235,6 +242,7 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.population").value(12345));
 
         mockMvc.perform(post("/api/database/city-state")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
                 .andExpect(status().isInternalServerError())
@@ -242,6 +250,7 @@ public class FullParityIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.message").value("City and State entry already exists."));
 
         mockMvc.perform(post("/api/database/city-state")
+                .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"cityName\":null,\"stateName\":\"State\",\"population\":0,\"latitude\":0,\"longitude\":0}"))
                 .andExpect(status().isBadRequest())
