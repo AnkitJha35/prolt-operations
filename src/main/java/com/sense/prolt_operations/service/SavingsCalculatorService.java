@@ -57,6 +57,9 @@ import com.sense.prolt_operations.service.calculator.constant.RegulatoryFallback
 import com.sense.prolt_operations.service.calculator.constant.SavingsCalculatorConstants;
 import com.sense.prolt_operations.service.calculator.constant.TaxConstants;
 import com.sense.prolt_operations.service.calculator.constant.UnitConstants;
+import com.sense.prolt_operations.dto.calculator.LandingPriceCalculationRequest;
+import com.sense.prolt_operations.dto.calculator.LandingPriceCalculationResponse;
+import com.sense.prolt_operations.service.calculator.LandingPriceCalculatorService;
 import com.sense.prolt_operations.service.calculator.model.DemandShiftInsights;
 import com.sense.prolt_operations.service.calculator.model.MatchedTariffRate;
 import com.sense.prolt_operations.service.calculator.RegulatoryChargeResolver;
@@ -89,10 +92,11 @@ public class SavingsCalculatorService {
     private final Hv2SavingsCalculator hv2SavingsCalculator;
     private final ClientOverviewAggregator clientOverviewAggregator;
     private final RegulatoryChargeResolver regulatoryChargeResolver;
+    private final LandingPriceCalculatorService landingPriceCalculatorService;
     private final CalculatorProperties properties;
 
     /**
-     * Canonical Spring {@code @Autowired} constructor injecting all 17 collaborators and configuration properties.
+     * Canonical Spring {@code @Autowired} constructor injecting all 18 collaborators and configuration properties.
      */
     @org.springframework.beans.factory.annotation.Autowired
     public SavingsCalculatorService(SavingsCalculatorEntryRepository entryRepository,
@@ -105,6 +109,7 @@ public class SavingsCalculatorService {
             FinancialLedgerReconciler financialLedgerReconciler, DemandShiftOptimizer demandShiftOptimizer,
             Hv2SavingsCalculator hv2SavingsCalculator, ClientOverviewAggregator clientOverviewAggregator,
             RegulatoryChargeResolver regulatoryChargeResolver,
+            LandingPriceCalculatorService landingPriceCalculatorService,
             CalculatorProperties properties) {
         this.entryRepository = entryRepository;
         this.historyRepository = historyRepository;
@@ -133,6 +138,29 @@ public class SavingsCalculatorService {
                         this.objectMapper, this.properties, this.regulatoryChargeResolver);
         this.clientOverviewAggregator = clientOverviewAggregator != null ? clientOverviewAggregator
                 : new ClientOverviewAggregator(this.properties);
+        this.landingPriceCalculatorService = landingPriceCalculatorService != null ? landingPriceCalculatorService
+                : new LandingPriceCalculatorService(this.dataAccessService, this.regulatoryChargeResolver,
+                        this.landedCostCalculator, this.electricalLossCalculator, this.properties);
+    }
+
+    /**
+     * Backward-compatibility 17-argument constructor (pre-V18LP.2) delegating to the canonical constructor.
+     */
+    public SavingsCalculatorService(SavingsCalculatorEntryRepository entryRepository,
+            SavingsCalculatorEntryHistoryRepository historyRepository,
+            SavingsCalculatorDataAccessService dataAccessService, ObjectMapper objectMapper,
+            NpclTariffSchedule npclTariffSchedule, ElectricalLossCalculator electricalLossCalculator,
+            LandedCostCalculator landedCostCalculator, SevenMarketArbitrator sevenMarketArbitrator,
+            RtmContiguitySolver rtmContiguitySolver, ForwardBankingAllocator forwardBankingAllocator,
+            OperationalOverheadCalculator operationalOverheadCalculator,
+            FinancialLedgerReconciler financialLedgerReconciler, DemandShiftOptimizer demandShiftOptimizer,
+            Hv2SavingsCalculator hv2SavingsCalculator, ClientOverviewAggregator clientOverviewAggregator,
+            RegulatoryChargeResolver regulatoryChargeResolver,
+            CalculatorProperties properties) {
+        this(entryRepository, historyRepository, dataAccessService, objectMapper, npclTariffSchedule,
+                electricalLossCalculator, landedCostCalculator, sevenMarketArbitrator, rtmContiguitySolver,
+                forwardBankingAllocator, operationalOverheadCalculator, financialLedgerReconciler, demandShiftOptimizer,
+                hv2SavingsCalculator, clientOverviewAggregator, regulatoryChargeResolver, null, properties);
     }
 
     /**
@@ -235,9 +263,9 @@ public class SavingsCalculatorService {
     }
 
     /**
-     * Calculates direct landed cost comparison for quick prospects.
-     * Note: "Acme Steel Mills" (or UP HV-2 33kV) represents a standardized benchmark industrial
-     * profile with fixed pre-calculated cost components matching legacy client proposals.
+     * Calculates direct landed cost comparison dynamically using the independent Landing Price Calculator.
+     * Evaluates dynamic client profiles, state tariffs, regulatory adders, and market landing costs,
+     * replacing legacy static benchmark constants.
      */
     public LandedCostCalcResponse calculateDirect(LandedCostCalcRequest req) {
         if (req == null || req.state() == null || req.state().trim().isEmpty()) {
@@ -251,62 +279,175 @@ public class SavingsCalculatorService {
         BigDecimal consumption = req.consumptionKwh() != null ? req.consumptionKwh()
                 : BigDecimal.valueOf(defaultProspect);
 
-        boolean isAcmeBenchmark = "Acme Steel Mills".equalsIgnoreCase(req.clientName());
-        boolean isUp = req.state().toLowerCase().contains("uttar") || "UP".equalsIgnoreCase(req.state());
-        boolean isHv2 = req.tariffCategory() != null && req.tariffCategory().toUpperCase().contains("HV-2");
-        boolean is33kv = req.connectedVoltage() != null && req.connectedVoltage().toUpperCase().contains("33");
+        // 1. Dynamic Profile Resolution
+        // Match against existing saved profile in entryRepository if clientName is provided
+        SavingsCalculatorEntry profile = null;
+        if (req.clientName() != null && !req.clientName().trim().isEmpty()) {
+            String clientTrimmed = req.clientName().trim();
+            profile = entryRepository.findAll().stream()
+                    .filter(e -> clientTrimmed.equalsIgnoreCase(e.getClientName()))
+                    .findFirst()
+                    .orElse(null);
+        }
 
+        // State resolution
+        String stateInput = req.state().trim();
+        String stateCode = (profile != null && profile.getStateCode() != null && !profile.getStateCode().isBlank())
+                ? profile.getStateCode() : stateInput;
+
+        // DISCOM resolution
+        String discom = profile != null ? profile.getDiscom() : null;
+        if (discom == null || discom.isBlank()) {
+            boolean isUp = stateCode.toLowerCase().contains("uttar") || "UP".equalsIgnoreCase(stateCode);
+            if (isUp && req.tariffCategory() != null && req.tariffCategory().toUpperCase().contains("HV-2")) {
+                discom = "NPCL";
+            }
+        }
+
+        // Power factor resolution
+        double defaultPf = properties != null && properties.getRegulatory() != null
+                ? properties.getRegulatory().getDefaultPowerFactor()
+                : RegulatoryConstants.DEFAULT_POWER_FACTOR;
+        double powerFactor = (profile != null && profile.getPowerFactor() != null && profile.getPowerFactor().doubleValue() > 0)
+                ? profile.getPowerFactor().doubleValue() : defaultPf;
+
+        // Consumer category resolution
+        String rawCategory = (req.tariffCategory() != null && !req.tariffCategory().trim().isEmpty())
+                ? req.tariffCategory().trim()
+                : (profile != null && profile.getConsumerCategory() != null ? profile.getConsumerCategory() : "HV-2");
+
+        // Voltage level resolution
+        String rawVoltage = (req.connectedVoltage() != null && !req.connectedVoltage().trim().isEmpty())
+                ? req.connectedVoltage().trim()
+                : (profile != null && profile.getVoltageLevel() != null ? profile.getVoltageLevel() : "33 kV");
+
+        // Sanctioned load resolution (kW)
+        double minOaKw = properties != null && properties.getRegulatory() != null
+                ? properties.getRegulatory().getMinOaEligibilityKw()
+                : RegulatoryConstants.MIN_OA_ELIGIBILITY_KW;
+        Double sanctionedLoadKw = null;
+        if (req.contractDemandKva() != null && req.contractDemandKva().doubleValue() > 0) {
+            sanctionedLoadKw = req.contractDemandKva().doubleValue() * powerFactor;
+        } else if (profile != null && profile.getSanctionedLoadKw() != null) {
+            sanctionedLoadKw = profile.getSanctionedLoadKw().doubleValue();
+        } else {
+            sanctionedLoadKw = minOaKw;
+        }
+
+        // Electricity duty & margins
+        Boolean applyDuty = profile != null && profile.getApplyElectricityDuty() != null
+                ? profile.getApplyElectricityDuty() : Boolean.TRUE;
+        Double traderMargin = profile != null && profile.getTraderMargin() != null
+                ? profile.getTraderMargin().doubleValue() : 0.02;
+
+        // Delivery date resolution
+        LocalDate deliveryDate = LocalDate.now();
+        if (req.monthYear() != null && !req.monthYear().trim().isEmpty()) {
+            String my = req.monthYear().trim();
+            if (my.contains("-")) {
+                String[] parts = my.split("-");
+                try {
+                    int y = Integer.parseInt(parts[0]);
+                    int m = Integer.parseInt(parts[1]);
+                    deliveryDate = LocalDate.of(y, m, 1);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        LandingPriceCalculationRequest.CalculationMode calcMode = req.calculationMode() != null
+                ? req.calculationMode() : LandingPriceCalculationRequest.CalculationMode.OPEN_ACCESS_LANDED;
+
+        // 2. Dynamic MCP Resolution
+        LocalDate startDate = deliveryDate.withDayOfMonth(1);
+        LocalDate endDate = deliveryDate.withDayOfMonth(deliveryDate.lengthOfMonth());
+        List<ExchangeRateSlotProjection> slots = dataAccessService.getExchangeRateSlots(stateCode, startDate, endDate);
+
+        Double dynamicMcpKwh = null;
+        if (slots != null && !slots.isEmpty()) {
+            dynamicMcpKwh = slots.stream()
+                    .filter(s -> s.getDamMcp() != null)
+                    .mapToDouble(s -> s.getDamMcp().doubleValue() / UnitConstants.KWH_PER_MWH)
+                    .average()
+                    .orElse(4.16);
+        } else {
+            dynamicMcpKwh = 4.16; // Benchmark default when historical slot table is unpopulated
+        }
+
+        // 3. Invoke Independent Landing Price Calculator
+        LandingPriceCalculationRequest landingReq = new LandingPriceCalculationRequest(
+                stateCode,
+                rawCategory,
+                rawVoltage,
+                discom,
+                deliveryDate,
+                1,
+                dynamicMcpKwh,
+                null,
+                null,
+                null,
+                sanctionedLoadKw,
+                powerFactor,
+                applyDuty,
+                traderMargin,
+                calcMode
+        );
+
+        LandingPriceCalculationResponse landingResp = landingPriceCalculatorService.calculate(landingReq);
+
+        // 4. Mathematical Reconstruction for LandedCostCalcResponse
+        double effectiveDiscomLanding = landingResp.discomTariff().effectiveDiscomLandingPrice();
+        BigDecimal discomBillAmount = consumption.multiply(BigDecimal.valueOf(effectiveDiscomLanding))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal iexTotalCost;
         BigDecimal energyCost;
         BigDecimal ctuLossAndCharges;
         BigDecimal stLossAndCharges;
         BigDecimal crossSubsidySurcharge;
         BigDecimal additionalSurcharge;
-        BigDecimal discomBillAmount;
 
-        if (isAcmeBenchmark || (isUp && isHv2 && is33kv)) {
-            discomBillAmount = BigDecimal.valueOf(10525000.00).setScale(2, RoundingMode.HALF_UP);
-            energyCost = BigDecimal.valueOf(5200000.00).setScale(2, RoundingMode.HALF_UP);
-            ctuLossAndCharges = BigDecimal.valueOf(620000.00).setScale(2, RoundingMode.HALF_UP);
-            stLossAndCharges = BigDecimal.valueOf(480000.00).setScale(2, RoundingMode.HALF_UP);
-            crossSubsidySurcharge = BigDecimal.valueOf(850000.00).setScale(2, RoundingMode.HALF_UP);
-            additionalSurcharge = BigDecimal.valueOf(270000.00).setScale(2, RoundingMode.HALF_UP);
+        if (calcMode == LandingPriceCalculationRequest.CalculationMode.BUSBAR_COMPARISON) {
+            double busbarPrice = landingResp.comparison().bestMarketPrice();
+            energyCost = consumption.multiply(BigDecimal.valueOf(busbarPrice)).setScale(2, RoundingMode.HALF_UP);
+            ctuLossAndCharges = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            stLossAndCharges = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            crossSubsidySurcharge = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            additionalSurcharge = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            iexTotalCost = energyCost;
         } else {
-            double ctuVal = properties != null && properties.getFallback() != null
-                    ? properties.getFallback().getCtuPerKwh() : RegulatoryFallbackConstants.DEFAULT_CTU_PER_KWH;
-            double stuVal = properties != null && properties.getFallback() != null
-                    ? properties.getFallback().getStuPerKwh() : RegulatoryFallbackConstants.DEFAULT_STU_PER_KWH;
-            double cssVal = properties != null && properties.getFallback() != null
-                    ? properties.getFallback().getCrossSubsidyPerKwh() : RegulatoryFallbackConstants.DEFAULT_CROSS_SUBSIDY_PER_KWH;
-            double asVal = properties != null && properties.getFallback() != null
-                    ? properties.getFallback().getAdditionalSurchargePerKwh() : RegulatoryFallbackConstants.DEFAULT_ADDITIONAL_SURCHARGE_PER_KWH;
+            double lossCoeff = landingResp.losses().compoundLossCoefficient() > 0
+                    ? landingResp.losses().compoundLossCoefficient() : 1.0;
 
-            energyCost = consumption.multiply(BigDecimal.valueOf(4.16)).setScale(2, RoundingMode.HALF_UP);
-            ctuLossAndCharges = consumption
-                    .multiply(BigDecimal.valueOf(ctuVal))
+            double ctuPerKwh = landingResp.regulatoryCharges().ctuCharge() / lossCoeff;
+            double stuAndWheelingPerKwh = (landingResp.regulatoryCharges().stuCharge() + landingResp.regulatoryCharges().wheelingCharge()) / lossCoeff;
+            double cssPerKwh = landingResp.regulatoryCharges().crossSubsidy() / lossCoeff;
+            double asPerKwh = landingResp.regulatoryCharges().additionalSurcharge() / lossCoeff;
+
+            ctuLossAndCharges = consumption.multiply(BigDecimal.valueOf(ctuPerKwh)).setScale(2, RoundingMode.HALF_UP);
+            stLossAndCharges = consumption.multiply(BigDecimal.valueOf(stuAndWheelingPerKwh)).setScale(2, RoundingMode.HALF_UP);
+            crossSubsidySurcharge = consumption.multiply(BigDecimal.valueOf(cssPerKwh)).setScale(2, RoundingMode.HALF_UP);
+            additionalSurcharge = consumption.multiply(BigDecimal.valueOf(asPerKwh)).setScale(2, RoundingMode.HALF_UP);
+
+            double totalLandedPrice = landingResp.comparison().bestMarketPrice();
+            iexTotalCost = consumption.multiply(BigDecimal.valueOf(totalLandedPrice)).setScale(2, RoundingMode.HALF_UP);
+
+            energyCost = iexTotalCost.subtract(ctuLossAndCharges)
+                    .subtract(stLossAndCharges)
+                    .subtract(crossSubsidySurcharge)
+                    .subtract(additionalSurcharge)
                     .setScale(2, RoundingMode.HALF_UP);
-            stLossAndCharges = consumption.multiply(BigDecimal.valueOf(stuVal))
-                    .setScale(2, RoundingMode.HALF_UP);
-            crossSubsidySurcharge = consumption
-                    .multiply(BigDecimal.valueOf(cssVal))
-                    .setScale(2, RoundingMode.HALF_UP);
-            additionalSurcharge = consumption
-                    .multiply(BigDecimal.valueOf(asVal))
-                    .setScale(2, RoundingMode.HALF_UP);
-            discomBillAmount = consumption.multiply(BigDecimal.valueOf(8.42)).setScale(2, RoundingMode.HALF_UP);
         }
 
-        BigDecimal iexTotalCost = energyCost.add(ctuLossAndCharges).add(stLossAndCharges).add(crossSubsidySurcharge)
-                .add(additionalSurcharge).setScale(2, RoundingMode.HALF_UP);
-
         BigDecimal totalSavings = discomBillAmount.subtract(iexTotalCost).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal percentageSavings = totalSavings.multiply(BigDecimal.valueOf(100)).divide(discomBillAmount, 2,
-                RoundingMode.HALF_UP);
+        BigDecimal percentageSavings = discomBillAmount.compareTo(BigDecimal.ZERO) > 0
+                ? totalSavings.multiply(BigDecimal.valueOf(100)).divide(discomBillAmount, 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
-        LandedCostCalcResponse.CostBreakdown breakdown = new LandedCostCalcResponse.CostBreakdown(energyCost,
-                ctuLossAndCharges, stLossAndCharges, crossSubsidySurcharge, additionalSurcharge);
+        LandedCostCalcResponse.CostBreakdown breakdown = new LandedCostCalcResponse.CostBreakdown(
+                energyCost, ctuLossAndCharges, stLossAndCharges, crossSubsidySurcharge, additionalSurcharge);
 
-        LandedCostCalcResponse.LandedCostData data = new LandedCostCalcResponse.LandedCostData(discomBillAmount,
-                iexTotalCost, totalSavings, percentageSavings, breakdown);
+        LandedCostCalcResponse.LandedCostData data = new LandedCostCalcResponse.LandedCostData(
+                discomBillAmount, iexTotalCost, totalSavings, percentageSavings, breakdown);
 
         return new LandedCostCalcResponse(true, data);
     }
